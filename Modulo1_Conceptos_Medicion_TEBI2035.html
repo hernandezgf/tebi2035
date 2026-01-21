@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Módulo 1A: Conceptos Básicos de Medición - TEBI 2035</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .step-content { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .step-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .stepper-item.completed .stepper-circle { background-color: #10b981; border-color: #10b981; }
+        .stepper-item.active .stepper-circle { background-color: #3b82f6; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3); }
+        .stepper-item .stepper-circle { transition: all 0.3s ease; }
+        .concept-card { transition: all 0.3s ease; }
+        .concept-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); }
+        .scale-card { border-left: 4px solid; }
+        .quiz-option { transition: all 0.2s ease; }
+        .quiz-option:hover:not(.selected):not(.correct):not(.incorrect) { background-color: #f0f9ff; border-color: #3b82f6; }
+        .quiz-option.selected { background-color: #dbeafe; border-color: #3b82f6; }
+        .quiz-option.correct { background-color: #d1fae5; border-color: #10b981; }
+        .quiz-option.incorrect { background-color: #fee2e2; border-color: #ef4444; }
+        .progress-bar { transition: width 0.5s ease; }
+        .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; }
+        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .timer-badge { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .timer-locked { cursor: not-allowed !important; opacity: 0.6; }
+
+        /* Modal de Login */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-content { background: white; border-radius: 1rem; padding: 2rem; max-width: 400px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: modalIn 0.3s ease; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .modal-hidden { display: none !important; }
+        .sync-indicator { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; z-index: 100; transition: all 0.3s ease; }
+        .sync-saving { background: #fef3c7; color: #92400e; }
+        .sync-saved { background: #d1fae5; color: #065f46; }
+        .sync-error { background: #fee2e2; color: #991b1b; }
+        .user-badge { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Modal de Login -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-user-graduate text-blue-600 text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">Bienvenido</h2>
+                <p class="text-gray-600 text-sm mt-1">TEBI 2035 - Módulo 1A</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="student-id" class="block text-sm font-medium text-gray-700 mb-1">ID de Estudiante</label>
+                    <input type="text" id="student-id" placeholder="Ej: A12345" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors" required>
+                </div>
+                <div id="login-error" class="hidden text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                    <i class="fas fa-exclamation-circle mr-2"></i><span></span>
+                </div>
+                <button type="submit" id="login-btn" class="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                    <span>Ingresar</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+            <p class="text-xs text-gray-500 text-center mt-4">Tu progreso se guardará automáticamente</p>
+        </div>
+    </div>
+
+    <!-- Indicador de sincronización -->
+    <div id="sync-indicator" class="sync-indicator modal-hidden">
+        <i class="fas fa-sync-alt mr-2"></i><span>Guardando...</span>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-700 to-blue-900 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold">TEBI 2035</h1>
+                    <p class="text-blue-200 text-sm md:text-base">Biometría Médica y Transducción</p>
+                </div>
+                <div class="mt-4 md:mt-0 text-right">
+                    <div id="user-info" class="hidden mb-2">
+                        <span class="user-badge"><i class="fas fa-user"></i><span id="user-name">Estudiante</span></span>
+                    </div>
+                    <p class="text-sm text-blue-200">Instituto Tecnológico de Puerto Rico</p>
+                    <p class="text-xs text-blue-300">Prof. Felipe Hernández Gerena</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Progress Bar -->
+    <div class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-600">Progreso del módulo</span>
+                <span id="progress-text" class="text-sm font-semibold text-blue-600">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="progress-bar" class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- Stepper Sidebar -->
+            <aside class="lg:w-1/4">
+                <div class="bg-white rounded-xl shadow-md p-6 sticky top-24">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-list-ol mr-2 text-blue-600"></i>Contenido
+                    </h3>
+                    <div class="space-y-4" id="stepper"></div>
+                </div>
+            </aside>
+
+            <!-- Content Area -->
+            <section class="lg:w-3/4">
+                <div class="bg-white rounded-xl shadow-md p-6 md:p-8">
+                    
+                    <!-- Step 1: Introducción -->
+                    <div class="step-content active" data-step="1">
+                        <div class="mb-8">
+                            <span class="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-4">Unidad I - Módulo 1A</span>
+                            <h2 class="text-3xl font-bold text-gray-800 mb-4">Conceptos Básicos de Medición</h2>
+                            <p class="text-gray-600 text-lg">Bienvenido al primer módulo del curso TEBI 2035. En esta unidad aprenderás los fundamentos de la medición aplicados al campo de la biometría médica.</p>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl p-6 mb-8">
+                            <h3 class="text-xl font-semibold mb-3"><i class="fas fa-bullseye mr-2"></i>Objetivos de Aprendizaje</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Comprender y aplicar los tipos de medición (cualitativa y cuantitativa) en contextos biomédicos</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Aprender sobre las variables clave y las unidades de medición específicas en biometría</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Adquirir conocimientos sobre los procesos de medición, incluyendo calibración</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Distinguir entre las diferentes escalas de medición</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Desarrollar habilidades para asegurar la precisión y confiabilidad en los sistemas de medición</span></li>
+                            </ul>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="concept-card bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6">
+                                <div class="text-blue-600 text-3xl mb-3"><i class="fas fa-ruler-combined"></i></div>
+                                <h4 class="font-semibold text-gray-800 mb-2">¿Qué es Medir?</h4>
+                                <p class="text-gray-600 text-sm">Proceso de comparar un patrón seleccionado con el objeto o fenómeno cuya magnitud física se desea medir.</p>
+                            </div>
+                            <div class="concept-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6">
+                                <div class="text-green-600 text-3xl mb-3"><i class="fas fa-flask"></i></div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Metrología</h4>
+                                <p class="text-gray-600 text-sm">La ciencia de las mediciones. Del griego "metrón" (medida) y "logos" (lógica).</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-8">
+                            <p class="text-yellow-800"><i class="fas fa-lightbulb mr-2"></i><strong>Dato importante:</strong> La medición es un proceso básico de la ciencia que consiste en asociar un valor numérico con una cantidad física o química a través de compararla con una cantidad previamente establecida, aceptada y que es constante (un estándar).</p>
+                        </div>
+
+                        <!-- Diagrama SVG: Sistema de Medida -->
+                        <div class="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-6 border border-blue-200">
+                            <h4 class="font-semibold text-gray-800 mb-4 text-center"><i class="fas fa-project-diagram mr-2 text-blue-600"></i>Sistema de Medida</h4>
+                            <div class="overflow-x-auto">
+                                <svg viewBox="0 0 800 280" class="w-full max-w-4xl mx-auto" style="min-width: 600px;">
+                                    <!-- Fondo general -->
+                                    <defs>
+                                        <linearGradient id="gradEntrada" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#dbeafe"/>
+                                            <stop offset="100%" style="stop-color:#bfdbfe"/>
+                                        </linearGradient>
+                                        <linearGradient id="gradSistema" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#fef3c7"/>
+                                            <stop offset="100%" style="stop-color:#fde68a"/>
+                                        </linearGradient>
+                                        <linearGradient id="gradSalida" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#d1fae5"/>
+                                            <stop offset="100%" style="stop-color:#a7f3d0"/>
+                                        </linearGradient>
+                                        <linearGradient id="gradBloque" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#f97316"/>
+                                            <stop offset="100%" style="stop-color:#ea580c"/>
+                                        </linearGradient>
+                                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                            <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
+                                        </marker>
+                                    </defs>
+
+                                    <!-- Bloque ENTRADA -->
+                                    <rect x="20" y="80" width="100" height="120" rx="8" fill="url(#gradEntrada)" stroke="#3b82f6" stroke-width="2"/>
+                                    <text x="70" y="110" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e40af">ENTRADAS</text>
+                                    <text x="70" y="130" text-anchor="middle" font-size="10" fill="#1e40af">(Valor verdadero)</text>
+                                    <text x="70" y="150" text-anchor="middle" font-size="9" fill="#374151">- Temperatura</text>
+                                    <text x="70" y="163" text-anchor="middle" font-size="9" fill="#374151">- Presion</text>
+                                    <text x="70" y="176" text-anchor="middle" font-size="9" fill="#374151">- pH, Luz, etc.</text>
+
+                                    <!-- Flecha 1 -->
+                                    <line x1="120" y1="140" x2="160" y2="140" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                                    <!-- SISTEMA DE MEDIDA (contenedor) -->
+                                    <rect x="160" y="50" width="480" height="180" rx="10" fill="url(#gradSistema)" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,5"/>
+                                    <text x="400" y="75" text-anchor="middle" font-size="14" font-weight="bold" fill="#92400e">SISTEMA DE MEDIDA</text>
+
+                                    <!-- Bloque Adquisicion -->
+                                    <rect x="180" y="100" width="120" height="60" rx="6" fill="url(#gradBloque)"/>
+                                    <text x="240" y="125" text-anchor="middle" font-size="11" font-weight="bold" fill="white">ADQUISICION</text>
+                                    <text x="240" y="140" text-anchor="middle" font-size="10" fill="white">DE DATOS</text>
+
+                                    <!-- Flecha 2 -->
+                                    <line x1="300" y1="130" x2="340" y2="130" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                                    <!-- Bloque Procesamiento -->
+                                    <rect x="340" y="100" width="120" height="60" rx="6" fill="url(#gradBloque)"/>
+                                    <text x="400" y="125" text-anchor="middle" font-size="11" font-weight="bold" fill="white">PROCESAMIENTO</text>
+                                    <text x="400" y="140" text-anchor="middle" font-size="10" fill="white">DE DATOS</text>
+
+                                    <!-- Flecha 3 -->
+                                    <line x1="460" y1="130" x2="500" y2="130" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                                    <!-- Bloque Distribucion -->
+                                    <rect x="500" y="100" width="120" height="60" rx="6" fill="url(#gradBloque)"/>
+                                    <text x="560" y="125" text-anchor="middle" font-size="11" font-weight="bold" fill="white">DISTRIBUCION</text>
+                                    <text x="560" y="140" text-anchor="middle" font-size="10" fill="white">DE DATOS</text>
+
+                                    <!-- Etiquetas debajo -->
+                                    <text x="240" y="185" text-anchor="middle" font-size="9" fill="#78350f">Sensor</text>
+                                    <text x="240" y="198" text-anchor="middle" font-size="9" fill="#78350f">Acondicionamiento</text>
+                                    <text x="240" y="211" text-anchor="middle" font-size="9" fill="#78350f">Conversion A/D</text>
+
+                                    <text x="400" y="185" text-anchor="middle" font-size="9" fill="#78350f">Procesador</text>
+                                    <text x="400" y="198" text-anchor="middle" font-size="9" fill="#78350f">Algoritmos</text>
+
+                                    <text x="560" y="185" text-anchor="middle" font-size="9" fill="#78350f">Conversion D/A</text>
+                                    <text x="560" y="198" text-anchor="middle" font-size="9" fill="#78350f">Transmision</text>
+
+                                    <!-- Flecha 4 -->
+                                    <line x1="620" y1="130" x2="660" y2="130" stroke="#3b82f6" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                                    <!-- Bloque SALIDA -->
+                                    <rect x="680" y="80" width="100" height="120" rx="8" fill="url(#gradSalida)" stroke="#10b981" stroke-width="2"/>
+                                    <text x="730" y="110" text-anchor="middle" font-size="12" font-weight="bold" fill="#065f46">SALIDAS</text>
+                                    <text x="730" y="130" text-anchor="middle" font-size="10" fill="#065f46">(Valor medido)</text>
+                                    <text x="730" y="150" text-anchor="middle" font-size="9" fill="#374151">- Visualizacion</text>
+                                    <text x="730" y="163" text-anchor="middle" font-size="9" fill="#374151">- Almacenamiento</text>
+                                    <text x="730" y="176" text-anchor="middle" font-size="9" fill="#374151">- Transmision</text>
+                                </svg>
+                            </div>
+                            <p class="text-xs text-gray-500 text-center mt-4"><i class="fas fa-info-circle mr-1"></i>Diagrama basado en la presentacion del curso - Todo sistema de medida sigue este flujo basico</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Naturaleza de los Sistemas de Medición -->
+                    <div class="step-content" data-step="2">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-microscope mr-3 text-blue-600"></i>Naturaleza de los Sistemas de Medición</h2>
+                        <p class="text-gray-700 mb-6 text-lg">En el campo de la biometría médica, podemos clasificar los sistemas de medición en dos grandes categorías según su naturaleza:</p>
+
+                        <div class="grid md:grid-cols-2 gap-8 mb-8">
+                            <div class="bg-white border-2 border-purple-200 rounded-xl p-6 hover:border-purple-400 transition-colors">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-palette text-purple-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-xl font-semibold text-gray-800">Metodología Cualitativa</h3>
+                                </div>
+                                <p class="text-gray-600 mb-4">Se basa en la <strong>descripción general</strong> de un objeto o fenómeno en base a sus cualidades observables, sin pretender saber la cantidad o intensidad del parámetro observado.</p>
+                                <div class="bg-purple-50 rounded-lg p-4">
+                                    <p class="text-purple-800 text-sm"><i class="fas fa-question-circle mr-2"></i><strong>Ejemplo:</strong> ¿De qué color son los globos?</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-white border-2 border-teal-200 rounded-xl p-6 hover:border-teal-400 transition-colors">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-calculator text-teal-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-xl font-semibold text-gray-800">Metodología Cuantitativa</h3>
+                                </div>
+                                <p class="text-gray-600 mb-4">Se basa en determinar la <strong>cantidad o intensidad</strong> de un objeto o fenómeno utilizando una referencia del parámetro que se está observando.</p>
+                                <div class="bg-teal-50 rounded-lg p-4">
+                                    <p class="text-teal-800 text-sm"><i class="fas fa-question-circle mr-2"></i><strong>Ejemplo:</strong> ¿Cuántos globos hay? ¿Cuánto es la intensidad del color?</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-100 rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-video mr-2 text-red-500"></i>Video: Datos Cualitativos vs Cuantitativos</h4>
+                            <div class="video-container rounded-lg overflow-hidden">
+                                <iframe src="https://www.youtube.com/embed/frtoxKN5Mvk?si=V_t2fXkoMvnFXXpz" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-50 rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-sliders-h mr-2 text-blue-600"></i>Concepto de Parámetro</h4>
+                            <p class="text-gray-700 mb-4">Un <strong>parámetro</strong> está definido como cualquier propiedad física o química cuyo valor, al ser especificado, caracteriza al fenómeno que lo exhibe.</p>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div class="bg-white rounded-lg p-4 border border-blue-200">
+                                    <p class="text-sm text-gray-600"><strong class="text-blue-700">Ejemplo 1:</strong><br>Fenómeno → Movimiento de la sangre<br>Parámetro → <strong>Presión sanguínea</strong></p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 border border-blue-200">
+                                    <p class="text-sm text-gray-600"><strong class="text-blue-700">Ejemplo 2:</strong><br>Fenómeno → Actividad del corazón<br>Parámetro → <strong>Latidos por minuto (BPM)</strong></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-heartbeat mr-2 text-red-500"></i>Características de Señales Fisiológicas</h4>
+                            <p class="text-gray-700 mb-4">En biometría médica, es importante conocer los rangos típicos de amplitud y frecuencia de las señales fisiológicas:</p>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm bg-white rounded-lg overflow-hidden">
+                                    <thead>
+                                        <tr class="bg-indigo-600 text-white">
+                                            <th class="p-3 text-left">Señal Fisiológica</th>
+                                            <th class="p-3 text-center">Amplitud</th>
+                                            <th class="p-3 text-center">Rango de Frecuencia</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="border-b hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Electrocardiograma (ECG)</td>
+                                            <td class="p-3 text-center">0.5 - 4 mV</td>
+                                            <td class="p-3 text-center">0.01 - 250 Hz</td>
+                                        </tr>
+                                        <tr class="border-b bg-gray-50 hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Electroencefalograma (EEG)</td>
+                                            <td class="p-3 text-center">5 - 300 µV</td>
+                                            <td class="p-3 text-center">DC - 150 Hz</td>
+                                        </tr>
+                                        <tr class="border-b hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Electromiograma (EMG)</td>
+                                            <td class="p-3 text-center">0.1 - 5 mV</td>
+                                            <td class="p-3 text-center">DC - 10,000 Hz</td>
+                                        </tr>
+                                        <tr class="border-b bg-gray-50 hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Electrooculograma (EOG)</td>
+                                            <td class="p-3 text-center">50 - 3500 µV</td>
+                                            <td class="p-3 text-center">DC - 50 Hz</td>
+                                        </tr>
+                                        <tr class="border-b hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Electrogastrograma</td>
+                                            <td class="p-3 text-center">10 - 1000 µV</td>
+                                            <td class="p-3 text-center">DC - 1 Hz</td>
+                                        </tr>
+                                        <tr class="border-b bg-gray-50 hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Presión Sanguínea</td>
+                                            <td class="p-3 text-center">10 - 400 mmHg</td>
+                                            <td class="p-3 text-center">DC - 50 Hz</td>
+                                        </tr>
+                                        <tr class="hover:bg-indigo-50">
+                                            <td class="p-3 font-medium">Temperatura Corporal</td>
+                                            <td class="p-3 text-center">32 - 40 °C</td>
+                                            <td class="p-3 text-center">DC - 0.1 Hz</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3"><i class="fas fa-info-circle mr-1"></i>Estas características determinan los requisitos de los instrumentos de medición biomédica.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Escalas de Medición -->
+                    <div class="step-content" data-step="3">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-layer-group mr-3 text-blue-600"></i>Escalas de Medición</h2>
+                        <p class="text-gray-700 mb-6 text-lg">El proceso de asignar un valor numérico a una variable se llama <strong>medición</strong>. Existen cuatro tipos principales de escalas:</p>
+
+                        <div class="space-y-6 mb-8">
+                            <div class="scale-card border-red-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <span class="text-red-600 font-bold text-xl">N</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Escala Nominal</h4>
+                                        <p class="text-gray-600 mb-3">Utiliza los números para <strong>identificar</strong> que un dato pertenece a un grupo o categoría. No presenta orden o dimensión particular.</p>
+                                        <div class="bg-red-50 rounded-lg p-3">
+                                            <p class="text-red-800 text-sm"><i class="fas fa-tag mr-2"></i><strong>Ejemplos:</strong> Números de camiseta, tipo de sangre (A, B, AB, O), número de seguro social</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-orange-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <span class="text-orange-600 font-bold text-xl">O</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Escala Ordinal</h4>
+                                        <p class="text-gray-600 mb-3">Los números representan una <strong>clasificación</strong> (mayor que o menor que), sin representar una unidad de medida exacta.</p>
+                                        <div class="bg-orange-50 rounded-lg p-3">
+                                            <p class="text-orange-800 text-sm"><i class="fas fa-sort-numeric-down mr-2"></i><strong>Ejemplos:</strong> Orden de llegada en carrera, jerarquía militar, nivel de dolor</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-blue-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <span class="text-blue-600 font-bold text-xl">I</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Escala de Intervalo</h4>
+                                        <p class="text-gray-600 mb-3">Establece una <strong>unidad de medida</strong> que permite precisar cuánto se es mayor o menor. El cero es convencional (no absoluto).</p>
+                                        <div class="bg-blue-50 rounded-lg p-3">
+                                            <p class="text-blue-800 text-sm"><i class="fas fa-thermometer-half mr-2"></i><strong>Ejemplos:</strong> Temperatura en Celsius o Fahrenheit, fechas del calendario</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-green-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <span class="text-green-600 font-bold text-xl">R</span>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Escala de Razón</h4>
+                                        <p class="text-gray-600 mb-3">Similar a intervalo pero tiene <strong>cero absoluto</strong> (carencia de la característica). Permite razones y proporciones.</p>
+                                        <div class="bg-green-50 rounded-lg p-3">
+                                            <p class="text-green-800 text-sm"><i class="fas fa-balance-scale mr-2"></i><strong>Ejemplos:</strong> Temperatura en Kelvin, peso, altura, presión arterial</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-table mr-2 text-blue-600"></i>Tabla Comparativa</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="bg-blue-600 text-white">
+                                            <th class="p-3 text-left rounded-tl-lg">Escala</th>
+                                            <th class="p-3 text-center">Categorías</th>
+                                            <th class="p-3 text-center">Orden</th>
+                                            <th class="p-3 text-center">Intervalos Iguales</th>
+                                            <th class="p-3 text-center rounded-tr-lg">Cero Absoluto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="bg-white border-b"><td class="p-3 font-medium text-red-600">Nominal</td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i></td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i></td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i></td></tr>
+                                        <tr class="bg-gray-50 border-b"><td class="p-3 font-medium text-orange-600">Ordinal</td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i></td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i></td></tr>
+                                        <tr class="bg-white border-b"><td class="p-3 font-medium text-blue-600">Intervalo</td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i></td></tr>
+                                        <tr class="bg-gray-50"><td class="p-3 font-medium text-green-600">Razón</td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i></td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Precisión y Exactitud -->
+                    <div class="step-content" data-step="4">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-crosshairs mr-3 text-blue-600"></i>Precisión y Exactitud</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Dos conceptos fundamentales en cualquier sistema de medición. Aunque se confunden, representan características diferentes.</p>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+                                <h4 class="text-xl font-semibold text-blue-800 mb-3"><i class="fas fa-dot-circle mr-2"></i>Precisión</h4>
+                                <p class="text-gray-700 mb-4">Capacidad de un instrumento de dar el <strong>mismo resultado</strong> en mediciones diferentes realizadas en las mismas condiciones (repetibilidad).</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i>Depende de la resolución y estabilidad</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i>Mide la dispersión de los datos</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i>Relacionada con errores aleatorios</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i>Se asocia con la <strong>consistencia</strong></li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-green-50 rounded-xl p-6 border border-green-200">
+                                <h4 class="text-xl font-semibold text-green-800 mb-3"><i class="fas fa-bullseye mr-2"></i>Exactitud</h4>
+                                <p class="text-gray-700 mb-4">Capacidad de un instrumento de <strong>acercarse al valor real</strong> de la magnitud del objeto que se está midiendo.</p>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Depende de errores sistemáticos</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Proximidad al valor verdadero</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Se mejora con calibración</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i>Se asocia con la <strong>confiabilidad</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Diagrama SVG: Precision vs Exactitud (Dianas) -->
+                        <div class="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 mb-8 border border-slate-200">
+                            <h4 class="font-semibold text-gray-800 mb-4 text-center"><i class="fas fa-bullseye mr-2 text-red-500"></i>Visualizacion: Precision vs Exactitud</h4>
+                            <div class="overflow-x-auto">
+                                <svg viewBox="0 0 700 250" class="w-full max-w-3xl mx-auto" style="min-width: 500px;">
+                                    <!-- Diana 1: Exacto pero NO Preciso -->
+                                    <g transform="translate(50, 20)">
+                                        <circle cx="80" cy="80" r="70" fill="#fecaca" stroke="#dc2626" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="50" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="30" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="10" fill="#dc2626"/>
+                                        <circle cx="75" cy="55" r="6" fill="#1e40af"/>
+                                        <circle cx="95" cy="105" r="6" fill="#1e40af"/>
+                                        <circle cx="55" cy="90" r="6" fill="#1e40af"/>
+                                        <circle cx="105" cy="70" r="6" fill="#1e40af"/>
+                                        <circle cx="70" cy="110" r="6" fill="#1e40af"/>
+                                        <text x="80" y="175" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e40af">EXACTO</text>
+                                        <text x="80" y="192" text-anchor="middle" font-size="11" fill="#6b7280">(Accurate)</text>
+                                        <text x="80" y="210" text-anchor="middle" font-size="10" fill="#dc2626">Cerca del centro</text>
+                                        <text x="80" y="225" text-anchor="middle" font-size="10" fill="#dc2626">pero disperso</text>
+                                    </g>
+
+                                    <!-- Diana 2: Preciso pero NO Exacto -->
+                                    <g transform="translate(270, 20)">
+                                        <circle cx="80" cy="80" r="70" fill="#fecaca" stroke="#dc2626" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="50" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="30" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="10" fill="#dc2626"/>
+                                        <circle cx="125" cy="45" r="6" fill="#1e40af"/>
+                                        <circle cx="130" cy="55" r="6" fill="#1e40af"/>
+                                        <circle cx="120" cy="50" r="6" fill="#1e40af"/>
+                                        <circle cx="135" cy="48" r="6" fill="#1e40af"/>
+                                        <circle cx="128" cy="60" r="6" fill="#1e40af"/>
+                                        <text x="80" y="175" text-anchor="middle" font-size="13" font-weight="bold" fill="#1e40af">PRECISO</text>
+                                        <text x="80" y="192" text-anchor="middle" font-size="11" fill="#6b7280">(Consistent)</text>
+                                        <text x="80" y="210" text-anchor="middle" font-size="10" fill="#dc2626">Agrupados pero</text>
+                                        <text x="80" y="225" text-anchor="middle" font-size="10" fill="#dc2626">lejos del centro</text>
+                                    </g>
+
+                                    <!-- Diana 3: Exacto Y Preciso -->
+                                    <g transform="translate(490, 20)">
+                                        <circle cx="80" cy="80" r="70" fill="#bbf7d0" stroke="#16a34a" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="50" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="30" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+                                        <circle cx="80" cy="80" r="10" fill="#16a34a"/>
+                                        <circle cx="78" cy="78" r="6" fill="#1e40af"/>
+                                        <circle cx="82" cy="82" r="6" fill="#1e40af"/>
+                                        <circle cx="76" cy="83" r="6" fill="#1e40af"/>
+                                        <circle cx="84" cy="77" r="6" fill="#1e40af"/>
+                                        <circle cx="80" cy="80" r="6" fill="#1e40af"/>
+                                        <text x="80" y="175" text-anchor="middle" font-size="13" font-weight="bold" fill="#16a34a">EXACTO Y PRECISO</text>
+                                        <text x="80" y="192" text-anchor="middle" font-size="11" fill="#6b7280">(Accurate + Precise)</text>
+                                        <text x="80" y="210" text-anchor="middle" font-size="10" fill="#16a34a">Agrupados en</text>
+                                        <text x="80" y="225" text-anchor="middle" font-size="10" fill="#16a34a">el centro - IDEAL</text>
+                                    </g>
+                                </svg>
+                            </div>
+                            <div class="grid md:grid-cols-3 gap-4 mt-4 text-center text-sm">
+                                <div class="bg-blue-50 rounded-lg p-3">
+                                    <p class="text-blue-800"><strong>Confiabilidad alta</strong><br>Exactitud baja</p>
+                                </div>
+                                <div class="bg-orange-50 rounded-lg p-3">
+                                    <p class="text-orange-800"><strong>Consistencia alta</strong><br>Sesgo sistematico</p>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-3">
+                                    <p class="text-green-800"><strong>Objetivo ideal</strong><br>Calibracion correcta</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800 text-white rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold mb-4"><i class="fas fa-square-root-alt mr-2"></i>Expresión Matemática del Error</h4>
+                            <div class="bg-gray-900 rounded-lg p-4 text-center text-xl font-mono mb-4">X = T + (E<sub>v</sub> + E<sub>r</sub>)</div>
+                            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                                <div><p><strong>X</strong> = Medida observada</p><p><strong>T</strong> = Valor verdadero</p></div>
+                                <div><p><strong>E<sub>v</sub></strong> = Error de validez (sistemático)</p><p><strong>E<sub>r</sub></strong> = Error de consistencia (aleatorio)</p></div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-100 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-video mr-2 text-red-500"></i>Video: Precisión y Exactitud</h4>
+                            <!-- INSTRUCCIONES: Reemplaza VIDEO_ID_AQUI con el ID del video de YouTube -->
+                            <!-- El ID es la parte después de "v=" en la URL, ej: youtube.com/watch?v=XXXXX -->
+                            <div class="video-container rounded-lg overflow-hidden">
+                                <iframe src="https://www.youtube.com/embed/VIDEO_ID_PRECISION_EXACTITUD" title="Precisión y Exactitud" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2"><i class="fas fa-info-circle mr-1"></i>Buscar en YouTube: "precisión vs exactitud medición física"</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Sensibilidad, Resolución y SNR -->
+                    <div class="step-content" data-step="5">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-search-plus mr-3 text-blue-600"></i>Sensibilidad, Resolución y Relación Señal/Ruido</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Tres conceptos fundamentales que determinan la calidad de un sistema de medición biomédica.</p>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-6 border border-cyan-200">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-12 h-12 bg-cyan-500 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-tachometer-alt text-white text-xl"></i>
+                                    </div>
+                                    <h4 class="text-xl font-semibold text-cyan-800">Sensibilidad</h4>
+                                </div>
+                                <p class="text-gray-700 mb-4">La <strong>sensibilidad</strong> es la razón de cambio del estímulo de entrada sobre el cambio instrumental en la respuesta.</p>
+                                <div class="bg-white rounded-lg p-4 mb-3">
+                                    <p class="text-cyan-800 text-sm font-mono text-center">S = ΔOutput / ΔInput</p>
+                                </div>
+                                <p class="text-sm text-gray-600"><i class="fas fa-lightbulb mr-2 text-cyan-600"></i><strong>Ejemplo:</strong> Un termómetro con alta sensibilidad detectará cambios pequeños de temperatura.</p>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-12 h-12 bg-amber-500 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-ruler-vertical text-white text-xl"></i>
+                                    </div>
+                                    <h4 class="text-xl font-semibold text-amber-800">Resolución</h4>
+                                </div>
+                                <p class="text-gray-700 mb-4">La <strong>resolución</strong> es el cambio de entrada más pequeño que puede ser medido con certeza.</p>
+                                <div class="bg-white rounded-lg p-4 mb-3">
+                                    <p class="text-amber-800 text-sm">También conocida como <strong>discriminación</strong> o <strong>resolución de escala</strong>.</p>
+                                </div>
+                                <p class="text-sm text-gray-600"><i class="fas fa-lightbulb mr-2 text-amber-600"></i><strong>Ejemplo:</strong> Una balanza con resolución de 0.01g puede distinguir entre 10.00g y 10.01g.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl p-6 mb-8">
+                            <h4 class="text-xl font-semibold mb-4"><i class="fas fa-wave-square mr-2"></i>Relación Señal/Ruido (SNR)</h4>
+                            <p class="mb-4">La <strong>relación señal/ruido</strong> compara el nivel de la señal deseada con el nivel de ruido de fondo. Es crítica en instrumentación biomédica.</p>
+                            <div class="bg-white bg-opacity-20 rounded-lg p-4 mb-4">
+                                <p class="font-mono text-center text-lg">SNR = P<sub>señal</sub> / P<sub>ruido</sub></p>
+                                <p class="text-center text-sm mt-2">En decibelios: SNR(dB) = 10 × log₁₀(P<sub>señal</sub>/P<sub>ruido</sub>)</p>
+                            </div>
+                            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                                <div class="bg-white bg-opacity-10 rounded-lg p-3">
+                                    <p><i class="fas fa-check-circle mr-2"></i><strong>SNR alto:</strong> Señal clara, fácil de interpretar</p>
+                                </div>
+                                <div class="bg-white bg-opacity-10 rounded-lg p-3">
+                                    <p><i class="fas fa-times-circle mr-2"></i><strong>SNR bajo:</strong> Señal difícil de distinguir del ruido</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Diagrama SVG: Visualizacion Senal vs Ruido -->
+                        <div class="bg-white rounded-xl p-6 mb-8 border border-gray-200">
+                            <h4 class="font-semibold text-gray-800 mb-4 text-center"><i class="fas fa-wave-square mr-2 text-blue-600"></i>Visualizacion: Efecto del Ruido en la Senal</h4>
+                            <div class="overflow-x-auto">
+                                <svg viewBox="0 0 800 320" class="w-full max-w-4xl mx-auto" style="min-width: 600px;">
+                                    <!-- Senal Original (Limpia) -->
+                                    <g transform="translate(0, 0)">
+                                        <rect x="20" y="10" width="240" height="90" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+                                        <text x="140" y="30" text-anchor="middle" font-size="12" font-weight="bold" fill="#16a34a">SENAL ORIGINAL</text>
+
+                                        <!-- Onda sinusoidal limpia -->
+                                        <path d="M 40 60 Q 60 40, 80 60 T 120 60 T 160 60 T 200 60 T 240 60" fill="none" stroke="#16a34a" stroke-width="3"/>
+                                        <text x="140" y="88" text-anchor="middle" font-size="10" fill="#374151">Senal pura sin interferencias</text>
+                                    </g>
+
+                                    <!-- Signo + -->
+                                    <text x="280" y="60" text-anchor="middle" font-size="24" font-weight="bold" fill="#6b7280">+</text>
+
+                                    <!-- Ruido -->
+                                    <g transform="translate(300, 0)">
+                                        <rect x="20" y="10" width="240" height="90" rx="8" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+                                        <text x="140" y="30" text-anchor="middle" font-size="12" font-weight="bold" fill="#dc2626">RUIDO</text>
+
+                                        <!-- Ruido aleatorio -->
+                                        <path d="M 40 60 L 50 55 L 55 70 L 65 50 L 75 65 L 85 45 L 95 68 L 105 52 L 115 72 L 125 48 L 135 66 L 145 54 L 155 70 L 165 46 L 175 64 L 185 56 L 195 62 L 205 50 L 215 68 L 225 55 L 235 60 L 240 58" fill="none" stroke="#dc2626" stroke-width="2"/>
+                                        <text x="140" y="88" text-anchor="middle" font-size="10" fill="#374151">Interferencia aleatoria</text>
+                                    </g>
+
+                                    <!-- Signo = -->
+                                    <text x="570" y="60" text-anchor="middle" font-size="24" font-weight="bold" fill="#6b7280">=</text>
+
+                                    <!-- Senal con Ruido (Resultado) -->
+                                    <g transform="translate(590, 0)">
+                                        <rect x="20" y="10" width="180" height="90" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+                                        <text x="110" y="30" text-anchor="middle" font-size="12" font-weight="bold" fill="#b45309">SENAL MEDIDA</text>
+
+                                        <!-- Senal con ruido -->
+                                        <path d="M 35 60 Q 45 35, 55 55 L 60 62 Q 70 42, 80 58 L 85 65 Q 95 38, 105 55 L 110 52 Q 120 45, 130 62 L 135 58 Q 145 35, 155 58 L 165 55 L 175 60 L 185 52" fill="none" stroke="#b45309" stroke-width="2.5"/>
+                                        <text x="110" y="88" text-anchor="middle" font-size="10" fill="#374151">Senal + Ruido</text>
+                                    </g>
+
+                                    <!-- Segunda fila: Comparacion SNR Alto vs Bajo -->
+                                    <text x="400" y="130" text-anchor="middle" font-size="14" font-weight="bold" fill="#374151">Comparacion: SNR Alto vs SNR Bajo</text>
+
+                                    <!-- SNR Alto -->
+                                    <g transform="translate(50, 145)">
+                                        <rect x="0" y="0" width="320" height="160" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+                                        <text x="160" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#10b981">SNR ALTO (Buena calidad)</text>
+
+                                        <!-- Ejes -->
+                                        <line x1="30" y1="130" x2="300" y2="130" stroke="#9ca3af" stroke-width="1"/>
+                                        <line x1="30" y1="50" x2="30" y2="130" stroke="#9ca3af" stroke-width="1"/>
+
+                                        <!-- Senal con poco ruido -->
+                                        <path d="M 40 90 Q 70 50, 100 90 T 160 90 T 220 90 T 280 90" fill="none" stroke="#10b981" stroke-width="3"/>
+
+                                        <!-- Pequeno ruido -->
+                                        <path d="M 40 90 L 50 88 L 60 92 L 70 50 L 80 52 L 90 48 L 100 90 L 110 92 L 120 88 L 130 130 L 140 128 L 150 132 L 160 90 L 170 88 L 180 91 L 190 50 L 200 52 L 210 49 L 220 90 L 230 88 L 240 92 L 250 130 L 260 128 L 270 132 L 280 90" fill="none" stroke="#10b981" stroke-width="2" opacity="0.7"/>
+
+                                        <text x="160" y="150" text-anchor="middle" font-size="10" fill="#065f46">Senal claramente identificable</text>
+                                    </g>
+
+                                    <!-- SNR Bajo -->
+                                    <g transform="translate(430, 145)">
+                                        <rect x="0" y="0" width="320" height="160" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+                                        <text x="160" y="25" text-anchor="middle" font-size="13" font-weight="bold" fill="#dc2626">SNR BAJO (Mala calidad)</text>
+
+                                        <!-- Ejes -->
+                                        <line x1="30" y1="130" x2="300" y2="130" stroke="#9ca3af" stroke-width="1"/>
+                                        <line x1="30" y1="50" x2="30" y2="130" stroke="#9ca3af" stroke-width="1"/>
+
+                                        <!-- Senal original tenue -->
+                                        <path d="M 40 90 Q 70 50, 100 90 T 160 90 T 220 90 T 280 90" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="5,3" opacity="0.5"/>
+
+                                        <!-- Mucho ruido -->
+                                        <path d="M 40 85 L 45 110 L 50 70 L 55 95 L 60 55 L 65 100 L 70 45 L 75 85 L 80 60 L 85 110 L 90 40 L 95 95 L 100 85 L 105 120 L 110 65 L 115 100 L 120 80 L 125 130 L 130 75 L 135 110 L 140 50 L 145 90 L 150 70 L 155 115 L 160 85 L 165 125 L 170 60 L 175 100 L 180 45 L 185 85 L 190 55 L 195 100 L 200 70 L 205 115 L 210 50 L 215 95 L 220 80 L 225 120 L 230 55 L 235 100 L 240 65 L 245 110 L 250 75 L 255 130 L 260 85 L 265 105 L 270 60 L 275 95 L 280 85" fill="none" stroke="#dc2626" stroke-width="2"/>
+
+                                        <text x="160" y="150" text-anchor="middle" font-size="10" fill="#991b1b">Senal dificil de interpretar</text>
+                                    </g>
+                                </svg>
+                            </div>
+                            <p class="text-xs text-gray-500 text-center mt-4"><i class="fas fa-info-circle mr-1"></i>Un buen sistema de medicion biomedica debe maximizar el SNR mediante filtrado y blindaje adecuado</p>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-exclamation-circle mr-2 text-red-500"></i>Fuentes de Ruido en Biometría</h4>
+                            <div class="grid md:grid-cols-3 gap-4">
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <p class="font-semibold text-gray-700 mb-2"><i class="fas fa-bolt mr-2 text-yellow-500"></i>Ruido Eléctrico</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Interferencia 60 Hz</li>
+                                        <li>• Ruido térmico</li>
+                                        <li>• EMI</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <p class="font-semibold text-gray-700 mb-2"><i class="fas fa-running mr-2 text-blue-500"></i>Artefactos de Movimiento</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Movimiento del paciente</li>
+                                        <li>• Vibración de cables</li>
+                                        <li>• Respiración</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <p class="font-semibold text-gray-700 mb-2"><i class="fas fa-heartbeat mr-2 text-red-500"></i>Ruido Fisiológico</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Actividad muscular</li>
+                                        <li>• Otros biopotenciales</li>
+                                        <li>• Variabilidad biológica</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 6: Tipos de Error -->
+                    <div class="step-content" data-step="6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-exclamation-triangle mr-3 text-blue-600"></i>Tipos de Error en la Medición</h2>
+                        <p class="text-gray-700 mb-6 text-lg">El <strong>error de medición</strong> se define como la diferencia entre el valor medido y el valor verdadero. Existen dos tipos básicos:</p>
+
+                        <div class="grid md:grid-cols-2 gap-8 mb-8">
+                            <div class="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-14 h-14 bg-red-500 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-arrow-right text-white text-xl"></i>
+                                    </div>
+                                    <h4 class="text-xl font-semibold text-red-800">Error Sistemático</h4>
+                                </div>
+                                <p class="text-gray-700 mb-4">Error que aparece <strong>consistentemente igual</strong> en cada medición. La desviación es reproducible y predecible.</p>
+                                <div class="bg-white rounded-lg p-4 mb-4">
+                                    <p class="text-sm font-semibold text-red-700 mb-2">Causas comunes:</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Calibración inadecuada</li>
+                                        <li>• Impedancias no pareadas</li>
+                                        <li>• Error de respuesta-tiempo</li>
+                                        <li>• Falta de linealidad</li>
+                                        <li>• Malfuncionamiento del instrumento</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-red-200 rounded-lg p-3">
+                                    <p class="text-red-800 text-sm"><i class="fas fa-tools mr-2"></i><strong>Solución:</strong> Proceso de <strong>calibración</strong></p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-14 h-14 bg-purple-500 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-random text-white text-xl"></i>
+                                    </div>
+                                    <h4 class="text-xl font-semibold text-purple-800">Error Aleatorio</h4>
+                                </div>
+                                <p class="text-gray-700 mb-4">Error que hace variar la medición de forma <strong>aleatoria</strong> en ambas direcciones. Es impredecible.</p>
+                                <div class="bg-white rounded-lg p-4 mb-4">
+                                    <p class="text-sm font-semibold text-purple-700 mb-2">Causas comunes:</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Ruido eléctrico</li>
+                                        <li>• Interferencia electromagnética</li>
+                                        <li>• Vibraciones mecánicas</li>
+                                        <li>• Variaciones en la ganancia</li>
+                                        <li>• Factores ambientales variables</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-purple-200 rounded-lg p-3">
+                                    <p class="text-purple-800 text-sm"><i class="fas fa-calculator mr-2"></i><strong>Solución:</strong> <strong>Promedios estadísticos</strong></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-8">
+                            <p class="text-yellow-800"><i class="fas fa-info-circle mr-2"></i><strong>Importante:</strong> En sistemas biológicos, la fuente del error puede estar en la señal, el instrumento o la interfaz de ambos. El error aleatorio disminuye proporcionalmente a la raíz cuadrada del número de observaciones.</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-gray-800 to-gray-900 text-white rounded-xl p-6">
+                            <h4 class="text-xl font-semibold mb-4"><i class="fas fa-percentage mr-2 text-blue-400"></i>Error Absoluto y Error Relativo</h4>
+                            <div class="grid md:grid-cols-2 gap-6">
+                                <div class="bg-white bg-opacity-10 rounded-lg p-4">
+                                    <h5 class="font-semibold text-blue-300 mb-3">Error Absoluto (Ea)</h5>
+                                    <p class="text-gray-300 mb-3">La diferencia entre el valor medido y el valor real.</p>
+                                    <div class="bg-gray-700 rounded-lg p-3 text-center font-mono">
+                                        E<sub>a</sub> = |Valor medido - Valor real|
+                                    </div>
+                                    <p class="text-sm text-gray-400 mt-3"><strong>Ejemplo:</strong> Si mides 98.5°F pero la temperatura real es 98.6°F, el error absoluto es 0.1°F</p>
+                                </div>
+                                <div class="bg-white bg-opacity-10 rounded-lg p-4">
+                                    <h5 class="font-semibold text-green-300 mb-3">Error Relativo (Er)</h5>
+                                    <p class="text-gray-300 mb-3">El error absoluto expresado como fracción o porcentaje del valor real.</p>
+                                    <div class="bg-gray-700 rounded-lg p-3 text-center font-mono">
+                                        E<sub>r</sub> = (E<sub>a</sub> / Valor real) × 100%
+                                    </div>
+                                    <p class="text-sm text-gray-400 mt-3"><strong>Ejemplo:</strong> Con E<sub>a</sub>=0.1°F y valor real=98.6°F, el error relativo es ≈0.1%</p>
+                                </div>
+                            </div>
+                            <div class="mt-4 bg-blue-900 bg-opacity-50 rounded-lg p-3">
+                                <p class="text-sm text-blue-200"><i class="fas fa-lightbulb mr-2"></i><strong>Nota:</strong> El error relativo es más útil para comparar la calidad de mediciones de diferentes magnitudes.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 7: Calibración -->
+                    <div class="step-content" data-step="7">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-balance-scale-right mr-3 text-blue-600"></i>Calibración y Estándares</h2>
+                        <p class="text-gray-700 mb-6 text-lg">La <strong>calibración</strong> es fundamental para mantener la confiabilidad de los instrumentos de medición en el campo biomédico.</p>
+
+                        <div class="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-xl p-6 mb-8">
+                            <h4 class="text-xl font-semibold mb-3"><i class="fas fa-cogs mr-2"></i>¿Qué es la Calibración?</h4>
+                            <p class="mb-4">La calibración se refiere a la posibilidad de <strong>ajustar o verificar</strong> un instrumento de medición para que se ajuste a la realidad, dentro del margen de error.</p>
+                            <div class="bg-blue-900 bg-opacity-50 rounded-lg p-4">
+                                <p class="text-blue-100"><i class="fas fa-lightbulb mr-2"></i><strong>Nota:</strong> La calibración no afecta la precisión, pero sí la exactitud de la medición.</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-sitemap mr-2 text-blue-600"></i>Jerarquía de los Patrones (Estándares)</h4>
+                            <div class="bg-gray-50 rounded-xl p-6">
+                                <div class="flex flex-col items-center space-y-2">
+                                    <div class="w-full max-w-md">
+                                        <div class="bg-gradient-to-r from-yellow-400 to-yellow-500 text-white rounded-lg p-3 text-center shadow-lg"><i class="fas fa-globe mr-2"></i><strong>Patrón Internacional</strong><p class="text-xs mt-1">BIPM - Oficina Internacional de Pesos y Medidas</p></div>
+                                        <div class="w-0.5 h-4 bg-gray-300 mx-auto"></div>
+                                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg p-3 text-center shadow-lg"><i class="fas fa-flag mr-2"></i><strong>Patrón Nacional Primario</strong></div>
+                                        <div class="w-0.5 h-4 bg-gray-300 mx-auto"></div>
+                                        <div class="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-lg p-3 text-center shadow-lg"><i class="fas fa-building mr-2"></i><strong>Patrón Nacional Secundario</strong></div>
+                                        <div class="w-0.5 h-4 bg-gray-300 mx-auto"></div>
+                                        <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg p-3 text-center shadow-lg"><i class="fas fa-flask mr-2"></i><strong>Patrón de Referencia</strong></div>
+                                        <div class="w-0.5 h-4 bg-gray-300 mx-auto"></div>
+                                        <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg p-3 text-center shadow-lg"><i class="fas fa-wrench mr-2"></i><strong>Patrón de Trabajo</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800 text-white rounded-xl p-6">
+                            <h5 class="font-semibold mb-3"><i class="fas fa-certificate mr-2 text-yellow-400"></i>Norma ISO 10012</h5>
+                            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                                <ul class="space-y-2">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Todos los equipos deben ser identificados y calibrados</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Mantener registros de calibración</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Trazabilidad a estándares nacionales</li>
+                                </ul>
+                                <ul class="space-y-2">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Determinar incertidumbre de medición</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Establecer frecuencia de recalibración</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i>Procedimientos documentados</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 8: Medición Directa e Indirecta -->
+                    <div class="step-content" data-step="8">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-ruler mr-3 text-blue-600"></i>Medición Directa e Indirecta</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Las mediciones pueden clasificarse según el método utilizado para obtener el valor de la magnitud física.</p>
+
+                        <div class="grid md:grid-cols-2 gap-8 mb-8">
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-teal-500 to-teal-600 text-white p-4">
+                                    <h4 class="text-xl font-semibold"><i class="fas fa-ruler-horizontal mr-2"></i>Medición Directa</h4>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-gray-700 mb-4">La medida se obtiene con un instrumento que <strong>compara directamente</strong> la variable a medir con un patrón.</p>
+                                    <div class="bg-teal-50 rounded-lg p-4 mb-4">
+                                        <p class="text-teal-800 text-sm"><i class="fas fa-lightbulb mr-2"></i>Se compara magnitud con magnitud (distancia-distancia, frecuencia-frecuencia).</p>
+                                    </div>
+                                    <p class="text-sm font-semibold text-gray-700">Ejemplos:</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Medir longitud con regla</li>
+                                        <li>• Medir masa con balanza de brazos</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white p-4">
+                                    <h4 class="text-xl font-semibold"><i class="fas fa-calculator mr-2"></i>Medición Indirecta</h4>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-gray-700 mb-4">La magnitud se estima midiendo <strong>otras magnitudes</strong> y calculando mediante operaciones matemáticas.</p>
+                                    <div class="bg-indigo-50 rounded-lg p-4 mb-4">
+                                        <p class="text-indigo-800 text-sm"><i class="fas fa-lightbulb mr-2"></i>Usa transductores que convierten señales físicas en eléctricas.</p>
+                                    </div>
+                                    <p class="text-sm font-semibold text-gray-700">Ejemplos:</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• Presión con esfigmomanómetro</li>
+                                        <li>• Temperatura con termistor</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-heartbeat mr-2 text-red-500"></i>Aplicación en Campo Biomédico</h4>
+                            <p class="text-gray-700 mb-4">En biometría médica, la mayoría de las mediciones son <strong>indirectas</strong>, ya que los parámetros fisiológicos se convierten en señales eléctricas mediante transductores.</p>
+                            <div class="bg-white rounded-lg p-4">
+                                <p class="text-sm text-gray-600"><strong>Proceso típico:</strong> Señal fisiológica → Transductor → Señal eléctrica → Procesamiento → Visualización</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 9: Resumen -->
+                    <div class="step-content" data-step="9">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-clipboard-list mr-3 text-blue-600"></i>Resumen y Puntos Clave</h2>
+
+                        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl p-6 mb-8">
+                            <h3 class="text-xl font-semibold mb-4"><i class="fas fa-star mr-2"></i>Lo que aprendiste en este módulo</h3>
+                            <p class="text-blue-100">Has completado el Módulo 1A. Aquí están los puntos más importantes para tu prueba corta.</p>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="space-y-4">
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-blue-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-ruler-combined mr-2 text-blue-500"></i>Definición de Medición</h5>
+                                    <p class="text-sm text-gray-600">Proceso de comparar un patrón con el objeto o fenómeno cuya magnitud se desea medir.</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-green-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-layer-group mr-2 text-green-500"></i>Escalas de Medición</h5>
+                                    <p class="text-sm text-gray-600"><strong>Nominal:</strong> Categorías sin orden<br><strong>Ordinal:</strong> Orden sin intervalos iguales<br><strong>Intervalo:</strong> Intervalos iguales, sin cero absoluto<br><strong>Razón:</strong> Intervalos iguales con cero absoluto</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-purple-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-crosshairs mr-2 text-purple-500"></i>Precisión vs Exactitud</h5>
+                                    <p class="text-sm text-gray-600"><strong>Precisión:</strong> Repetibilidad (consistencia)<br><strong>Exactitud:</strong> Cercanía al valor verdadero (confiabilidad)</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-cyan-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-search-plus mr-2 text-cyan-500"></i>Sensibilidad, Resolución y SNR</h5>
+                                    <p class="text-sm text-gray-600"><strong>Sensibilidad:</strong> Razón de cambio entrada/salida<br><strong>Resolución:</strong> Cambio mínimo detectable<br><strong>SNR:</strong> Señal deseada vs ruido</p>
+                                </div>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-red-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-exclamation-triangle mr-2 text-red-500"></i>Tipos de Error</h5>
+                                    <p class="text-sm text-gray-600"><strong>Sistemático:</strong> Predecible, se corrige con calibración<br><strong>Aleatorio:</strong> Impredecible, se reduce con promedios<br><strong>Absoluto:</strong> Diferencia con valor real<br><strong>Relativo:</strong> Error como porcentaje</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-orange-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-cogs mr-2 text-orange-500"></i>Calibración</h5>
+                                    <p class="text-sm text-gray-600">Proceso de ajustar o verificar un instrumento. Afecta la exactitud, no la precisión.</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-teal-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-sitemap mr-2 text-teal-500"></i>Jerarquía de Patrones</h5>
+                                    <p class="text-sm text-gray-600">Internacional → Nacional Primario → Nacional Secundario → De Referencia → De Trabajo</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                            <h4 class="font-semibold text-yellow-800 mb-3"><i class="fas fa-lightbulb mr-2"></i>Consejos para tu Prueba Corta</h4>
+                            <ul class="space-y-2 text-yellow-800">
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Diferencia las cuatro escalas de medición con ejemplos</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Recuerda la diferencia entre precisión y exactitud</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Conoce las causas de los errores sistemáticos y aleatorios</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Entiende el propósito de la calibración</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Comprende sensibilidad, resolución y relación señal/ruido</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Diferencia entre error absoluto y error relativo</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Step 10: Autoevaluación -->
+                    <div class="step-content" data-step="10">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-question-circle mr-3 text-blue-600"></i>Autoevaluación</h2>
+                        <p class="text-gray-700 mb-6">Responde las siguientes preguntas para verificar tu comprensión. Esta autoevaluación <strong>no tiene calificación</strong>, es solo para práctica.</p>
+
+                        <div id="quiz-container" class="space-y-6">
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="1">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 1:</span> ¿Qué tipo de escala se usa al clasificar pacientes por tipo de sangre (A, B, AB, O)?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">a) Escala Nominal</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">b) Escala Ordinal</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Escala de Intervalo</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Escala de Razón</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="2">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 2:</span> Un instrumento que da resultados muy similares pero alejados del valor verdadero es:</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Preciso y exacto</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Preciso pero no exacto</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Exacto pero no preciso</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Ni preciso ni exacto</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="3">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 3:</span> ¿Qué proceso corrige el error sistemático?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Promedio estadístico</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Calibración</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Filtrado de señales</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Amplificación</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="4">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 4:</span> La temperatura en grados Celsius es escala de:</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Nominal</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">b) Ordinal</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">c) Intervalo</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Razón</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="5">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 5:</span> ¿Cuál es la diferencia principal entre medición directa e indirecta?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) La precisión del resultado</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">b) El costo del instrumento</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">c) Si se compara directamente con patrón o se mide otra magnitud relacionada</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) La velocidad de la medición</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="6">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 6:</span> ¿Qué indica una relación señal/ruido (SNR) alta?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) La señal tiene mucho ruido</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) La señal es clara y fácil de interpretar</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) El instrumento necesita calibración</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) La medición es indirecta</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="7">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-blue-600">Pregunta 7:</span> Si mides 100 mmHg pero el valor real es 102 mmHg, ¿cuál es el error relativo?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) 2 mmHg</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Aproximadamente 2%</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) 0.02 mmHg</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) 100%</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+                        </div>
+
+                        <div id="quiz-results" class="hidden mt-8 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl p-6">
+                            <h4 class="text-xl font-semibold mb-2"><i class="fas fa-trophy mr-2"></i>Resultados de tu Autoevaluación</h4>
+                            <p id="quiz-score" class="text-lg"></p>
+                            <p class="text-blue-100 mt-2 text-sm">Recuerda: Esta autoevaluación es solo práctica. Tu prueba corta será presencial.</p>
+                        </div>
+
+                        <div class="mt-8 bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+                            <div class="text-green-600 text-5xl mb-4"><i class="fas fa-check-circle"></i></div>
+                            <h4 class="text-xl font-semibold text-green-800 mb-2">¡Has completado el Módulo 1A!</h4>
+                            <p class="text-green-700">Estás listo para continuar con el Módulo 1B: Transductores y Sensores. ¡Mucho éxito!</p>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Buttons -->
+                    <div class="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+                        <button id="prev-btn" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fas fa-arrow-left mr-2"></i>Anterior
+                        </button>
+                        <div class="flex flex-col items-center">
+                            <span id="step-indicator" class="text-gray-500 font-medium">Paso 1 de 10</span>
+                            <div id="timer-display" class="hidden mt-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-full text-sm font-medium timer-badge">
+                                <i class="fas fa-clock mr-2"></i><span id="timer-text">0:00</span>
+                            </div>
+                        </div>
+                        <button id="next-btn" class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                            Siguiente<i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-400 text-sm">TEBI 2035 - Biometría Médica y Transducción</p>
+            <p class="text-gray-500 text-xs mt-2">Instituto Tecnológico de Puerto Rico | Prof. Felipe Hernández Gerena</p>
+        </div>
+    </footer>
+
+    <script>
+        // ============================================
+        // CONFIGURACIÓN DE GOOGLE SHEETS
+        // ============================================
+        // INSTRUCCIONES: Reemplaza esta URL con la URL de tu Google Apps Script desplegado
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGJLPyP7mltJ__i07uUtfT8jrbxQW_0q2vEXTahot_ZqQiuMaWV0_lPP70zZd39VrGHw/exec';
+        const MODULE_ID = 'modulo1a';
+
+        // Variables de sesión del estudiante
+        let currentStudent = null;
+        let isOnlineMode = false;
+        let quizAlreadyTaken = false;
+
+        // ============================================
+        // FUNCIONES DE GOOGLE SHEETS
+        // ============================================
+
+        function showSyncIndicator(status, message) {
+            const indicator = document.getElementById('sync-indicator');
+            indicator.classList.remove('modal-hidden', 'sync-saving', 'sync-saved', 'sync-error');
+            indicator.classList.add(`sync-${status}`);
+            indicator.innerHTML = `<i class="fas fa-${status === 'saving' ? 'sync-alt fa-spin' : status === 'saved' ? 'check' : 'exclamation-triangle'} mr-2"></i><span>${message}</span>`;
+
+            if (status !== 'saving') {
+                setTimeout(() => indicator.classList.add('modal-hidden'), 3000);
+            }
+        }
+
+        async function verifyStudent(studentId) {
+            if (GOOGLE_SCRIPT_URL === 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI') {
+                // Modo offline - sin Google Sheets configurado
+                return { success: true, offline: true, name: 'Estudiante (Modo Local)', studentId: studentId };
+            }
+
+            try {
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=verify&studentId=${encodeURIComponent(studentId)}`);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error verificando estudiante:', error);
+                return { success: false, error: 'Error de conexión' };
+            }
+        }
+
+        async function loadStudentProgress(studentId) {
+            if (!isOnlineMode) return null;
+
+            try {
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getProgress&studentId=${encodeURIComponent(studentId)}&moduleId=${MODULE_ID}`);
+                const data = await response.json();
+                return data.success ? data.progress : null;
+            } catch (error) {
+                console.error('Error cargando progreso:', error);
+                return null;
+            }
+        }
+
+        async function saveProgress(stepNum, completed = false) {
+            // Siempre guardar en localStorage
+            const localProgress = JSON.parse(localStorage.getItem(`progress_${MODULE_ID}`) || '{}');
+            localProgress.currentStep = stepNum;
+            localProgress.completedSteps = localProgress.completedSteps || [];
+            if (completed && !localProgress.completedSteps.includes(stepNum)) {
+                localProgress.completedSteps.push(stepNum);
+            }
+            localProgress.lastUpdated = new Date().toISOString();
+            localStorage.setItem(`progress_${MODULE_ID}`, JSON.stringify(localProgress));
+
+            // Si está en modo online, guardar en Google Sheets
+            if (isOnlineMode && currentStudent) {
+                showSyncIndicator('saving', 'Guardando...');
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'saveProgress',
+                            studentId: currentStudent.studentId,
+                            moduleId: MODULE_ID,
+                            currentStep: stepNum,
+                            completedSteps: localProgress.completedSteps,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                    showSyncIndicator('saved', 'Guardado');
+                } catch (error) {
+                    showSyncIndicator('error', 'Error al guardar');
+                }
+            }
+        }
+
+        async function saveQuizAnswer(questionNum, answer, isCorrect) {
+            // Guardar en localStorage
+            const localQuiz = JSON.parse(localStorage.getItem(`quiz_${MODULE_ID}`) || '{}');
+            localQuiz[`q${questionNum}`] = { answer, isCorrect, timestamp: new Date().toISOString() };
+            localStorage.setItem(`quiz_${MODULE_ID}`, JSON.stringify(localQuiz));
+
+            // Si está en modo online, guardar en Google Sheets
+            if (isOnlineMode && currentStudent) {
+                try {
+                    await fetch(GOOGLE_SCRIPT_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'saveQuizAnswer',
+                            studentId: currentStudent.studentId,
+                            moduleId: MODULE_ID,
+                            questionNum: questionNum,
+                            answer: answer,
+                            isCorrect: isCorrect,
+                            timestamp: new Date().toISOString()
+                        })
+                    });
+                } catch (error) {
+                    console.error('Error guardando respuesta:', error);
+                }
+            }
+        }
+
+        function checkIfQuizTaken() {
+            const localQuiz = JSON.parse(localStorage.getItem(`quiz_${MODULE_ID}`) || '{}');
+            const totalQuestions = document.querySelectorAll('.quiz-question').length;
+            let answeredCount = 0;
+
+            for (let i = 1; i <= totalQuestions; i++) {
+                if (localQuiz[`q${i}`]) {
+                    answeredCount++;
+                }
+            }
+
+            return answeredCount === totalQuestions;
+        }
+
+        function lockQuiz() {
+            quizAlreadyTaken = true;
+            const localQuiz = JSON.parse(localStorage.getItem(`quiz_${MODULE_ID}`) || '{}');
+
+            // Mostrar mensaje de quiz ya completado
+            const quizContainer = document.getElementById('quiz-container');
+            const lockedMessage = document.createElement('div');
+            lockedMessage.className = 'bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6';
+            lockedMessage.innerHTML = `
+                <div class="flex items-center">
+                    <div class="text-amber-500 text-3xl mr-4"><i class="fas fa-lock"></i></div>
+                    <div>
+                        <h4 class="font-semibold text-amber-800">Autoevaluación Completada</h4>
+                        <p class="text-amber-700 text-sm">Ya completaste esta autoevaluación. Solo se permite un intento.</p>
+                    </div>
+                </div>
+            `;
+            quizContainer.insertBefore(lockedMessage, quizContainer.firstChild);
+
+            // Bloquear todas las preguntas y mostrar respuestas anteriores
+            document.querySelectorAll('.quiz-question').forEach(question => {
+                const questionNum = question.dataset.question;
+                const savedAnswer = localQuiz[`q${questionNum}`];
+
+                question.classList.add('answered');
+                const options = question.querySelectorAll('.quiz-option');
+                const feedback = question.querySelector('.quiz-feedback');
+
+                options.forEach(opt => {
+                    opt.style.pointerEvents = 'none';
+                    opt.classList.add('opacity-60');
+
+                    if (opt.dataset.correct === 'true') {
+                        opt.classList.add('correct');
+                        opt.classList.remove('opacity-60');
+                    }
+
+                    if (savedAnswer && opt.textContent.trim() === savedAnswer.answer) {
+                        opt.classList.add('selected');
+                        opt.classList.remove('opacity-60');
+                        if (!savedAnswer.isCorrect) {
+                            opt.classList.add('incorrect');
+                        }
+                    }
+                });
+
+                if (savedAnswer) {
+                    feedback.classList.remove('hidden');
+                    if (savedAnswer.isCorrect) {
+                        feedback.innerHTML = '<i class="fas fa-check-circle text-green-600 mr-2"></i><span class="text-green-700">Respondiste correctamente.</span>';
+                        feedback.classList.add('bg-green-50');
+                    } else {
+                        feedback.innerHTML = '<i class="fas fa-times-circle text-red-600 mr-2"></i><span class="text-red-700">Tu respuesta fue incorrecta. La correcta está en verde.</span>';
+                        feedback.classList.add('bg-red-50');
+                    }
+                }
+            });
+
+            // Mostrar resultados
+            const totalQuestions = document.querySelectorAll('.quiz-question').length;
+            let correctCount = 0;
+            for (let i = 1; i <= totalQuestions; i++) {
+                if (localQuiz[`q${i}`] && localQuiz[`q${i}`].isCorrect) {
+                    correctCount++;
+                }
+            }
+
+            const resultsDiv = document.getElementById('quiz-results');
+            document.getElementById('quiz-score').textContent = `Obtuviste ${correctCount} de ${totalQuestions} respuestas correctas (${Math.round(correctCount/totalQuestions*100)}%)`;
+            resultsDiv.classList.remove('hidden');
+        }
+
+        // ============================================
+        // MANEJO DE LOGIN
+        // ============================================
+
+        document.getElementById('login-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const studentId = document.getElementById('student-id').value.trim().toUpperCase();
+            const loginBtn = document.getElementById('login-btn');
+            const loginError = document.getElementById('login-error');
+
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Verificando...';
+            loginError.classList.add('hidden');
+
+            const result = await verifyStudent(studentId);
+
+            if (result.success) {
+                currentStudent = result;
+                isOnlineMode = !result.offline;
+
+                // Mostrar nombre del estudiante
+                document.getElementById('user-name').textContent = result.name;
+                document.getElementById('user-info').classList.remove('hidden');
+
+                // Ocultar modal
+                document.getElementById('login-modal').classList.add('modal-hidden');
+
+                // Cargar progreso guardado
+                if (isOnlineMode) {
+                    const savedProgress = await loadStudentProgress(studentId);
+                    if (savedProgress && savedProgress.currentStep) {
+                        // Restaurar timers completados desde completedSteps
+                        if (savedProgress.completedSteps && savedProgress.completedSteps.length > 0) {
+                            savedProgress.completedSteps.forEach(step => {
+                                stepTimerCompleted[step] = true;
+                            });
+                        }
+                        goToStep(savedProgress.currentStep);
+                    }
+                } else {
+                    // Cargar desde localStorage
+                    const localProgress = JSON.parse(localStorage.getItem(`progress_${MODULE_ID}`) || '{}');
+                    if (localProgress.currentStep) {
+                        // Restaurar timers completados desde completedSteps
+                        if (localProgress.completedSteps && localProgress.completedSteps.length > 0) {
+                            localProgress.completedSteps.forEach(step => {
+                                stepTimerCompleted[step] = true;
+                            });
+                        }
+                        goToStep(localProgress.currentStep);
+                    }
+                }
+
+                // Iniciar el módulo
+                initStepper();
+                updateProgress();
+                startTimer(currentStep);
+
+                // Verificar si el quiz ya fue tomado
+                if (checkIfQuizTaken()) {
+                    lockQuiz();
+                }
+            } else {
+                loginError.querySelector('span').textContent = result.error || 'ID no encontrado. Contacta al profesor.';
+                loginError.classList.remove('hidden');
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<span>Ingresar</span><i class="fas fa-arrow-right"></i>';
+            }
+        });
+
+        // ============================================
+        // CONFIGURACIÓN DEL MÓDULO
+        // ============================================
+
+        const steps = [
+            { id: 1, title: 'Introducción', icon: 'fa-home', timerSeconds: 60 },
+            { id: 2, title: 'Sistemas de Medición', icon: 'fa-microscope', timerSeconds: 120 },
+            { id: 3, title: 'Escalas de Medición', icon: 'fa-layer-group', timerSeconds: 120 },
+            { id: 4, title: 'Precisión y Exactitud', icon: 'fa-crosshairs', timerSeconds: 90 },
+            { id: 5, title: 'Sensibilidad y SNR', icon: 'fa-search-plus', timerSeconds: 90 },
+            { id: 6, title: 'Tipos de Error', icon: 'fa-exclamation-triangle', timerSeconds: 90 },
+            { id: 7, title: 'Calibración', icon: 'fa-balance-scale-right', timerSeconds: 90 },
+            { id: 8, title: 'Medición Directa/Indirecta', icon: 'fa-ruler', timerSeconds: 90 },
+            { id: 9, title: 'Resumen', icon: 'fa-clipboard-list', timerSeconds: 60 },
+            { id: 10, title: 'Autoevaluación', icon: 'fa-question-circle', timerSeconds: 0 }
+        ];
+
+        // CONFIGURACION DEL TIMER - Cambiar a true para activar el timer
+        const TIMER_ENABLED = false;
+
+        let currentStep = 1;
+        const totalSteps = steps.length;
+        let timerInterval = null;
+        let remainingSeconds = 0;
+        let stepTimerCompleted = {};
+
+        function initStepper() {
+            const stepperContainer = document.getElementById('stepper');
+            stepperContainer.innerHTML = steps.map((step, index) => `
+                <div class="stepper-item flex items-center cursor-pointer ${index === 0 ? 'active' : ''}" data-step="${step.id}" onclick="goToStep(${step.id})">
+                    <div class="stepper-circle w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center mr-3 bg-white">
+                        <i class="fas ${step.icon} text-gray-400"></i>
+                    </div>
+                    <span class="text-sm text-gray-600 font-medium hidden md:inline">${step.title}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateProgress() {
+            const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+            document.getElementById('progress-text').textContent = `${Math.round(progress)}%`;
+        }
+
+        function updateStepper() {
+            document.querySelectorAll('.stepper-item').forEach((item, index) => {
+                const stepNum = index + 1;
+                const circle = item.querySelector('.stepper-circle');
+                const icon = circle.querySelector('i');
+                item.classList.remove('active', 'completed');
+                circle.classList.remove('bg-blue-600', 'bg-green-500', 'border-blue-600', 'border-green-500');
+                icon.classList.remove('text-white', 'text-blue-600', 'text-green-500');
+                icon.classList.add('text-gray-400');
+                if (stepNum < currentStep) {
+                    item.classList.add('completed');
+                    circle.classList.add('bg-green-500', 'border-green-500');
+                    icon.classList.remove('text-gray-400');
+                    icon.classList.add('text-white');
+                } else if (stepNum === currentStep) {
+                    item.classList.add('active');
+                    circle.classList.add('bg-blue-600', 'border-blue-600');
+                    icon.classList.remove('text-gray-400');
+                    icon.classList.add('text-white');
+                }
+            });
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer(stepNum) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            const step = steps[stepNum - 1];
+            const timerDisplay = document.getElementById('timer-display');
+            const timerText = document.getElementById('timer-text');
+            const nextBtn = document.getElementById('next-btn');
+
+            // Si el timer esta desactivado, desbloquear navegacion
+            if (!TIMER_ENABLED || step.timerSeconds === 0 || stepTimerCompleted[stepNum]) {
+                timerDisplay.classList.add('hidden');
+                nextBtn.disabled = false;
+                nextBtn.classList.remove('timer-locked');
+                return;
+            }
+
+            remainingSeconds = step.timerSeconds;
+            timerText.textContent = formatTime(remainingSeconds);
+            timerDisplay.classList.remove('hidden');
+            timerDisplay.classList.remove('bg-green-100', 'text-green-700');
+            timerDisplay.classList.add('bg-orange-100', 'text-orange-700');
+
+            nextBtn.disabled = true;
+            nextBtn.classList.add('timer-locked');
+            if (stepNum !== totalSteps) {
+                nextBtn.innerHTML = '<i class="fas fa-lock mr-2"></i>Espera...';
+            }
+
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                timerText.textContent = formatTime(remainingSeconds);
+
+                if (remainingSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    stepTimerCompleted[stepNum] = true;
+                    timerDisplay.classList.remove('bg-orange-100', 'text-orange-700');
+                    timerDisplay.classList.add('bg-green-100', 'text-green-700');
+                    timerText.innerHTML = '<i class="fas fa-check mr-1"></i>Listo';
+                    nextBtn.disabled = false;
+                    nextBtn.classList.remove('timer-locked');
+                    nextBtn.innerHTML = currentStep === totalSteps ? '<i class="fas fa-check mr-2"></i>Finalizar' : 'Siguiente<i class="fas fa-arrow-right ml-2"></i>';
+
+                    setTimeout(() => {
+                        timerDisplay.classList.add('hidden');
+                    }, 2000);
+                }
+            }, 1000);
+        }
+
+        function showStep(stepNum) {
+            document.querySelectorAll('.step-content').forEach(content => content.classList.remove('active'));
+            document.querySelector(`.step-content[data-step="${stepNum}"]`).classList.add('active');
+            document.getElementById('step-indicator').textContent = `Paso ${stepNum} de ${totalSteps}`;
+            document.getElementById('prev-btn').disabled = stepNum === 1;
+            document.getElementById('next-btn').innerHTML = stepNum === totalSteps ? '<i class="fas fa-check mr-2"></i>Finalizar' : 'Siguiente<i class="fas fa-arrow-right ml-2"></i>';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            startTimer(stepNum);
+        }
+
+        function goToStep(stepNum) {
+            if (stepNum >= 1 && stepNum <= totalSteps) {
+                if (stepNum > currentStep && remainingSeconds > 0 && !stepTimerCompleted[currentStep]) {
+                    return;
+                }
+                if (stepNum < currentStep) {
+                    currentStep = stepNum;
+                    showStep(currentStep);
+                    updateStepper();
+                    updateProgress();
+                    return;
+                }
+                for (let i = currentStep; i < stepNum; i++) {
+                    const step = steps[i - 1];
+                    if (step.timerSeconds > 0 && !stepTimerCompleted[i]) {
+                        return;
+                    }
+                }
+                currentStep = stepNum;
+                showStep(currentStep);
+                updateStepper();
+                updateProgress();
+            }
+        }
+
+        document.getElementById('next-btn').addEventListener('click', () => {
+            if (currentStep < totalSteps) {
+                // Guardar que se completó el paso actual
+                saveProgress(currentStep, true);
+                currentStep++;
+                showStep(currentStep);
+                updateStepper();
+                updateProgress();
+                // Guardar el nuevo paso actual
+                saveProgress(currentStep, false);
+            }
+        });
+
+        document.getElementById('prev-btn').addEventListener('click', () => {
+            if (currentStep > 1) {
+                currentStep--;
+                showStep(currentStep);
+                updateStepper();
+                updateProgress();
+            }
+        });
+
+        document.querySelectorAll('.quiz-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const question = this.closest('.quiz-question');
+                if (question.classList.contains('answered')) return;
+                question.classList.add('answered');
+                const questionNum = question.dataset.question;
+                const options = question.querySelectorAll('.quiz-option');
+                const feedback = question.querySelector('.quiz-feedback');
+                const isCorrect = this.dataset.correct === 'true';
+                const answerText = this.textContent.trim();
+
+                options.forEach(opt => {
+                    opt.classList.remove('hover:bg-gray-50');
+                    if (opt.dataset.correct === 'true') opt.classList.add('correct');
+                });
+                this.classList.add('selected');
+
+                // Guardar respuesta
+                saveQuizAnswer(questionNum, answerText, isCorrect);
+
+                if (isCorrect) {
+                    feedback.innerHTML = '<i class="fas fa-check-circle text-green-600 mr-2"></i><span class="text-green-700">¡Correcto! Excelente trabajo.</span>';
+                    feedback.classList.add('bg-green-50');
+                } else {
+                    this.classList.add('incorrect');
+                    feedback.innerHTML = '<i class="fas fa-times-circle text-red-600 mr-2"></i><span class="text-red-700">Incorrecto. Revisa la respuesta correcta en verde.</span>';
+                    feedback.classList.add('bg-red-50');
+                }
+                feedback.classList.remove('hidden');
+                checkQuizCompletion();
+            });
+        });
+
+        function checkQuizCompletion() {
+            const totalQuestions = document.querySelectorAll('.quiz-question').length;
+            const answeredQuestions = document.querySelectorAll('.quiz-question.answered').length;
+            if (answeredQuestions === totalQuestions && !quizAlreadyTaken) {
+                const correctAnswers = document.querySelectorAll('.quiz-option.selected[data-correct="true"]').length;
+                const resultsDiv = document.getElementById('quiz-results');
+                document.getElementById('quiz-score').textContent = `Obtuviste ${correctAnswers} de ${totalQuestions} respuestas correctas (${Math.round(correctAnswers/totalQuestions*100)}%)`;
+                resultsDiv.classList.remove('hidden');
+                resultsDiv.scrollIntoView({ behavior: 'smooth' });
+
+                // Marcar quiz como completado
+                quizAlreadyTaken = true;
+                const localQuiz = JSON.parse(localStorage.getItem(`quiz_${MODULE_ID}`) || '{}');
+                localQuiz.completed = true;
+                localQuiz.completedAt = new Date().toISOString();
+                localQuiz.score = correctAnswers;
+                localQuiz.total = totalQuestions;
+                localStorage.setItem(`quiz_${MODULE_ID}`, JSON.stringify(localQuiz));
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // No inicializar hasta que el estudiante haga login
+            // El stepper se inicializa después del login exitoso
+            document.getElementById('student-id').focus();
+        });
+    </script>
+</body>
+</html>

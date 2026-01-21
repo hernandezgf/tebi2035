@@ -1,0 +1,283 @@
+================================================================================
+INSTRUCCIONES PARA CONFIGURAR GOOGLE SHEETS - TEBI 2035
+================================================================================
+
+PASO 1: CREAR LA HOJA DE GOOGLE
+--------------------------------------------------------------------------------
+1. Ve a https://sheets.google.com
+2. Crea una nueva hoja de calculo llamada "TEBI2035_Datos"
+3. Crea 4 pestanas (hojas) con estos nombres exactos:
+   - Estudiantes
+   - Progreso
+   - Respuestas
+   - Tareas        <-- NUEVA PESTANA PARA TAREAS ESCRITAS
+
+4. En la pestana "Estudiantes", agrega estos encabezados en la fila 1:
+   | A           | B        | C         |
+   | studentId   | nombre   | email     |
+
+5. Agrega tus estudiantes debajo (ejemplo):
+   | A           | B                  | C                    |
+   | A12345      | Juan Perez         | juan@email.com       |
+   | A12346      | Maria Rodriguez    | maria@email.com      |
+
+6. En la pestana "Progreso", agrega estos encabezados:
+   | A           | B          | C             | D                | E            |
+   | studentId   | moduleId   | currentStep   | completedSteps   | timestamp    |
+
+7. En la pestana "Respuestas", agrega estos encabezados:
+   | A           | B          | C              | D          | E            | F            |
+   | studentId   | moduleId   | questionNum    | answer     | isCorrect    | timestamp    |
+
+8. En la pestana "Tareas", agrega estos encabezados:
+   | A           | B          | C        | D          | E           | F          | G            |
+   | studentId   | moduleId   | taskId   | response   | charCount   | timedOut   | timestamp    |
+
+   NOTA: La columna "response" contiene las descripciones escritas por los estudiantes.
+         La columna "timedOut" indica si el tiempo se agoto (Si/No).
+         La columna "charCount" indica la cantidad de caracteres escritos.
+
+
+PASO 2: CREAR EL GOOGLE APPS SCRIPT
+--------------------------------------------------------------------------------
+1. En tu hoja de Google, ve a: Extensiones > Apps Script
+2. Borra todo el codigo que aparece
+3. Copia el codigo del archivo "GoogleAppsScript.js" incluido en esta carpeta
+   O copia el codigo a continuacion:
+
+================================================================================
+// INICIO DEL CODIGO - COPIAR DESDE AQUI
+// IMPORTANTE: Este script incluye soporte para TAREAS ESCRITAS
+================================================================================
+
+const SPREADSHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+
+function doGet(e) {
+  if (!e || !e.parameter) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: 'No se recibieron parametros' }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const action = e.parameter.action;
+    const studentId = e.parameter.studentId;
+    let result = { success: false, error: 'Accion no valida' };
+
+    if (action === 'verify') {
+      result = verifyStudent(studentId);
+    } else if (action === 'getProgress') {
+      const moduleId = e.parameter.moduleId;
+      result = getProgress(studentId, moduleId);
+    } else if (action === 'getTask') {
+      const moduleId = e.parameter.moduleId;
+      const taskId = e.parameter.taskId;
+      result = getTaskResponse(studentId, moduleId, taskId);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+
+    if (action === 'saveProgress') {
+      saveProgress(data);
+    } else if (action === 'saveQuizAnswer') {
+      saveQuizAnswer(data);
+    } else if (action === 'saveTaskResponse') {
+      saveTaskResponse(data);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ success: false, error: error.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function verifyStudent(studentId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Estudiantes');
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0].toString().toUpperCase() === studentId.toUpperCase()) {
+      return {
+        success: true,
+        studentId: data[i][0],
+        name: data[i][1],
+        email: data[i][2]
+      };
+    }
+  }
+
+  return { success: false, error: 'Estudiante no encontrado' };
+}
+
+function getProgress(studentId, moduleId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Progreso');
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][0].toString().toUpperCase() === studentId.toUpperCase() &&
+        data[i][1] === moduleId) {
+      return {
+        success: true,
+        progress: {
+          currentStep: data[i][2],
+          completedSteps: data[i][3] ? data[i][3].toString().split(',').map(Number) : [],
+          timestamp: data[i][4]
+        }
+      };
+    }
+  }
+
+  return { success: true, progress: null };
+}
+
+function saveProgress(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Progreso');
+  const completedStepsStr = data.completedSteps ? data.completedSteps.join(',') : '';
+
+  sheet.appendRow([
+    data.studentId,
+    data.moduleId,
+    data.currentStep,
+    completedStepsStr,
+    data.timestamp
+  ]);
+}
+
+function saveQuizAnswer(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Respuestas');
+
+  sheet.appendRow([
+    data.studentId,
+    data.moduleId,
+    data.questionNum,
+    data.answer,
+    data.isCorrect,
+    data.timestamp
+  ]);
+}
+
+// --- FUNCIONES PARA TAREAS ESCRITAS ---
+
+function saveTaskResponse(data) {
+  let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tareas');
+
+  // Si la hoja no existe, la creamos
+  if (!sheet) {
+    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('Tareas');
+    sheet.appendRow(['studentId', 'moduleId', 'taskId', 'response', 'charCount', 'timedOut', 'timestamp']);
+    sheet.getRange(1, 1, 1, 7).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(4, 400);
+  }
+
+  sheet.appendRow([
+    data.studentId,
+    data.moduleId,
+    data.taskId,
+    data.response,
+    data.charCount,
+    data.timedOut ? 'Si' : 'No',
+    data.timestamp
+  ]);
+}
+
+function getTaskResponse(studentId, moduleId, taskId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Tareas');
+
+  if (!sheet) {
+    return { success: true, task: null };
+  }
+
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = data.length - 1; i >= 1; i--) {
+    if (data[i][0].toString().toUpperCase() === studentId.toUpperCase() &&
+        data[i][1] === moduleId &&
+        data[i][2] === taskId) {
+      return {
+        success: true,
+        task: {
+          response: data[i][3],
+          charCount: data[i][4],
+          timedOut: data[i][5] === 'Si',
+          timestamp: data[i][6]
+        }
+      };
+    }
+  }
+
+  return { success: true, task: null };
+}
+
+================================================================================
+// FIN DEL CODIGO - COPIAR HASTA AQUI
+================================================================================
+
+
+PASO 3: DESPLEGAR EL SCRIPT
+--------------------------------------------------------------------------------
+1. Guarda el proyecto (Ctrl+S o clic en el icono de guardar)
+2. Clic en "Implementar" > "Nueva implementacion"
+3. En "Tipo", selecciona "Aplicacion web"
+4. Configura:
+   - Descripcion: "API TEBI 2035"
+   - Ejecutar como: "Yo"
+   - Quien tiene acceso: "Cualquier usuario"
+5. Clic en "Implementar"
+6. Autoriza los permisos cuando te lo pida
+7. COPIA LA URL que te da (algo como: https://script.google.com/macros/s/XXXX/exec)
+
+
+PASO 4: CONFIGURAR EL MODULO HTML
+--------------------------------------------------------------------------------
+1. Abre el archivo Modulo1_Conceptos_Medicion_TEBI2035.html
+2. Busca esta linea cerca del inicio del <script>:
+
+   const GOOGLE_SCRIPT_URL = 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI';
+
+3. Reemplaza 'TU_URL_DE_GOOGLE_APPS_SCRIPT_AQUI' con la URL que copiaste
+4. Guarda el archivo
+
+
+PASO 5: PROBAR
+--------------------------------------------------------------------------------
+1. Sube los archivos a GitHub Pages
+2. Abre el modulo en el navegador
+3. Ingresa un ID de estudiante que hayas agregado en la hoja
+4. Verifica que el progreso se guarde en la hoja de Google
+
+
+NOTAS IMPORTANTES:
+--------------------------------------------------------------------------------
+- Si haces cambios al codigo del Apps Script, debes crear una NUEVA implementacion
+- La URL cambia con cada nueva implementacion
+- Los estudiantes deben estar pre-registrados en la hoja "Estudiantes"
+- Puedes ver el progreso y respuestas en tiempo real en Google Sheets
+- El sistema funciona en "modo local" si no configuras Google Sheets (guarda en el navegador)
+
+
+SOLUCION DE PROBLEMAS:
+--------------------------------------------------------------------------------
+- Si dice "ID no encontrado": Verifica que el ID este en la hoja Estudiantes
+- Si no guarda: Verifica que la URL del script este correcta
+- Si hay error CORS: Asegurate de que "Quien tiene acceso" sea "Cualquier usuario"
+- Para actualizar el script: Crea nueva implementacion y actualiza la URL
+
+================================================================================

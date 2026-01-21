@@ -1,0 +1,531 @@
+// ============================================
+// SISTEMA DE TAREAS Y CRONÓMETROS - TEBI 2035
+// ============================================
+// Soporta dos modos:
+// 1. hasTask: true - Tarea escrita con textarea (cronómetro inicia al escribir)
+// 2. hasTimer: true - Solo cronómetro (tiempo mínimo para avanzar, inicia automáticamente)
+
+const TASK_STATE = {
+    timers: {},           // Intervalos activos
+    status: {},           // Estado de cada tarea/timer
+    startTimes: {},       // Tiempo de inicio
+    remainingTimes: {},   // Tiempo restante
+    hasStarted: {}        // Si el cronómetro ha iniciado
+};
+
+// ============================================
+// INICIALIZACIÓN
+// ============================================
+
+/**
+ * Inicializa el sistema para un paso específico
+ */
+function initStepTimer(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    if (!step) return;
+
+    // Determinar el tipo de cronómetro
+    if (step.hasTask && step.taskDuration > 0) {
+        initTaskSystem(stepNum);
+    } else if (step.hasTimer && step.taskDuration > 0) {
+        initSimpleTimer(stepNum);
+    } else {
+        // Sin cronómetro - desbloquear navegación
+        unlockNavigation(stepNum);
+    }
+}
+
+/**
+ * Inicializa el sistema de tareas (con textarea)
+ */
+function initTaskSystem(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    const taskId = step.taskId;
+
+    // Verificar si la tarea ya fue completada
+    const savedTask = getSavedTask(taskId);
+    if (savedTask && savedTask.completed) {
+        showTaskCompleted(taskId, savedTask.response);
+        unlockNavigation(stepNum);
+        return;
+    }
+
+    // Verificar si hay tiempo guardado
+    const savedTime = getSavedTaskTime(taskId);
+    if (savedTime && savedTime.hasStarted) {
+        const elapsed = Math.floor((Date.now() - savedTime.savedAt) / 1000);
+        const remaining = Math.max(0, savedTime.remaining - elapsed);
+
+        if (remaining > 0) {
+            TASK_STATE.hasStarted[taskId] = true;
+            TASK_STATE.remainingTimes[taskId] = remaining;
+            startCountdown(taskId, stepNum, remaining, true);
+            updateTimerDisplay(taskId, remaining);
+            showTimerActive(taskId);
+        } else {
+            completeTaskByTimeout(taskId, stepNum);
+        }
+    } else {
+        TASK_STATE.remainingTimes[taskId] = step.taskDuration;
+        setupWritingTrigger(taskId, stepNum);
+    }
+
+    lockNavigation(stepNum);
+}
+
+/**
+ * Inicializa un cronómetro simple (sin textarea)
+ */
+function initSimpleTimer(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    const timerId = `step${stepNum}`;
+
+    // Verificar si ya se completó el tiempo
+    const savedTime = getSavedStepTime(stepNum);
+    if (savedTime && savedTime.completed) {
+        unlockNavigation(stepNum);
+        hideHeaderTimer();
+        return;
+    }
+
+    // Verificar si hay tiempo guardado
+    if (savedTime && savedTime.hasStarted) {
+        const elapsed = Math.floor((Date.now() - savedTime.savedAt) / 1000);
+        const remaining = Math.max(0, savedTime.remaining - elapsed);
+
+        if (remaining > 0) {
+            TASK_STATE.hasStarted[timerId] = true;
+            startSimpleCountdown(stepNum, remaining);
+        } else {
+            completeSimpleTimer(stepNum);
+        }
+    } else {
+        // Iniciar cronómetro automáticamente
+        TASK_STATE.hasStarted[timerId] = true;
+        startSimpleCountdown(stepNum, step.taskDuration);
+    }
+
+    lockNavigation(stepNum);
+}
+
+// ============================================
+// CRONÓMETRO SIMPLE (Solo tiempo mínimo)
+// ============================================
+
+function startSimpleCountdown(stepNum, duration) {
+    const timerId = `step${stepNum}`;
+
+    if (TASK_STATE.timers[timerId]) {
+        clearInterval(TASK_STATE.timers[timerId]);
+    }
+
+    TASK_STATE.remainingTimes[timerId] = duration;
+    TASK_STATE.startTimes[timerId] = Date.now();
+    TASK_STATE.status[timerId] = 'in_progress';
+
+    saveStepTime(stepNum, duration, false);
+    updateHeaderTimer(duration);
+    showHeaderTimerActive();
+
+    TASK_STATE.timers[timerId] = setInterval(() => {
+        TASK_STATE.remainingTimes[timerId]--;
+        const remaining = TASK_STATE.remainingTimes[timerId];
+
+        updateHeaderTimer(remaining);
+        saveStepTime(stepNum, remaining, false);
+
+        // Cambiar estilo según tiempo restante
+        if (remaining <= 120 && remaining > 60) {
+            showHeaderTimerWarning();
+        } else if (remaining <= 60) {
+            showHeaderTimerCritical();
+        }
+
+        if (remaining <= 0) {
+            clearInterval(TASK_STATE.timers[timerId]);
+            TASK_STATE.timers[timerId] = null;
+            completeSimpleTimer(stepNum);
+        }
+    }, 1000);
+}
+
+function completeSimpleTimer(stepNum) {
+    const timerId = `step${stepNum}`;
+    TASK_STATE.status[timerId] = 'completed';
+    saveStepTime(stepNum, 0, true);
+    unlockNavigation(stepNum);
+    showHeaderTimerComplete();
+}
+
+// ============================================
+// FUNCIONES DEL HEADER TIMER
+// ============================================
+
+function updateHeaderTimer(seconds) {
+    const headerTimer = document.getElementById('timer-display');
+    const headerTimerText = document.getElementById('timer-text');
+
+    if (headerTimer && headerTimerText) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        headerTimerText.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        headerTimer.classList.remove('hidden');
+    }
+}
+
+function showHeaderTimerActive() {
+    const headerTimer = document.getElementById('timer-display');
+    if (headerTimer) {
+        headerTimer.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-amber-100', 'text-amber-700', 'bg-red-100', 'text-red-700');
+        headerTimer.classList.add('bg-blue-100', 'text-blue-700');
+    }
+}
+
+function showHeaderTimerWarning() {
+    const headerTimer = document.getElementById('timer-display');
+    if (headerTimer) {
+        headerTimer.classList.remove('bg-blue-100', 'text-blue-700', 'bg-red-100', 'text-red-700');
+        headerTimer.classList.add('bg-amber-100', 'text-amber-700');
+    }
+}
+
+function showHeaderTimerCritical() {
+    const headerTimer = document.getElementById('timer-display');
+    if (headerTimer) {
+        headerTimer.classList.remove('bg-blue-100', 'text-blue-700', 'bg-amber-100', 'text-amber-700');
+        headerTimer.classList.add('bg-red-100', 'text-red-700');
+    }
+}
+
+function showHeaderTimerComplete() {
+    const headerTimer = document.getElementById('timer-display');
+    const headerTimerText = document.getElementById('timer-text');
+
+    if (headerTimer && headerTimerText) {
+        headerTimer.classList.remove('bg-blue-100', 'text-blue-700', 'bg-amber-100', 'text-amber-700', 'bg-red-100', 'text-red-700');
+        headerTimer.classList.add('bg-green-100', 'text-green-700');
+        headerTimerText.innerHTML = '<i class="fas fa-check mr-1"></i>Listo';
+
+        setTimeout(() => headerTimer.classList.add('hidden'), 2000);
+    }
+}
+
+function hideHeaderTimer() {
+    const headerTimer = document.getElementById('timer-display');
+    if (headerTimer) {
+        headerTimer.classList.add('hidden');
+    }
+}
+
+// ============================================
+// SISTEMA DE TAREAS CON TEXTAREA
+// ============================================
+
+function setupWritingTrigger(taskId, stepNum) {
+    const textarea = document.getElementById(`task-response-${taskId}`);
+    if (!textarea) return;
+
+    showWaitingToStart(taskId);
+
+    const startHandler = function(e) {
+        if (!TASK_STATE.hasStarted[taskId] && textarea.value.length > 0) {
+            TASK_STATE.hasStarted[taskId] = true;
+            textarea.removeEventListener('input', startHandler);
+
+            const step = CONFIG.STEPS[stepNum - 1];
+            startCountdown(taskId, stepNum, step.taskDuration, true);
+            showTimerActive(taskId);
+        }
+    };
+
+    textarea.addEventListener('input', startHandler);
+}
+
+function startCountdown(taskId, stepNum, duration, isTask) {
+    if (TASK_STATE.timers[taskId]) {
+        clearInterval(TASK_STATE.timers[taskId]);
+    }
+
+    TASK_STATE.remainingTimes[taskId] = duration;
+    TASK_STATE.startTimes[taskId] = Date.now();
+    TASK_STATE.status[taskId] = 'in_progress';
+
+    saveTaskTime(taskId, duration);
+    updateTimerDisplay(taskId, duration);
+    updateHeaderTimer(duration);
+
+    TASK_STATE.timers[taskId] = setInterval(() => {
+        TASK_STATE.remainingTimes[taskId]--;
+        const remaining = TASK_STATE.remainingTimes[taskId];
+
+        updateTimerDisplay(taskId, remaining);
+        updateHeaderTimer(remaining);
+        saveTaskTime(taskId, remaining);
+
+        if (remaining <= 120 && remaining > 60) {
+            showTimerWarning(taskId);
+            showHeaderTimerWarning();
+        } else if (remaining <= 60) {
+            showTimerCritical(taskId);
+            showHeaderTimerCritical();
+        }
+
+        if (remaining <= 0) {
+            clearInterval(TASK_STATE.timers[taskId]);
+            TASK_STATE.timers[taskId] = null;
+            if (isTask) {
+                completeTaskByTimeout(taskId, stepNum);
+            }
+        }
+    }, 1000);
+}
+
+function completeTaskByTimeout(taskId, stepNum) {
+    const textarea = document.getElementById(`task-response-${taskId}`);
+    const response = textarea ? textarea.value.trim() : '';
+
+    saveTaskResponse(taskId, response, true);
+    TASK_STATE.status[taskId] = 'completed';
+
+    const inputContainer = document.getElementById(`task-input-container-${taskId}`);
+    const timeoutContainer = document.getElementById(`task-timeout-${taskId}`);
+
+    if (inputContainer) inputContainer.classList.add('hidden');
+    if (timeoutContainer) timeoutContainer.classList.remove('hidden');
+
+    if (response) {
+        const savedResponseEl = document.getElementById(`saved-response-${taskId}`);
+        const completedContainer = document.getElementById(`task-completed-${taskId}`);
+        if (savedResponseEl) savedResponseEl.textContent = response;
+        if (completedContainer) completedContainer.classList.remove('hidden');
+    }
+
+    unlockNavigation(stepNum);
+    clearSavedTaskTime(taskId);
+    showHeaderTimerComplete();
+}
+
+function showTaskCompleted(taskId, response) {
+    const inputContainer = document.getElementById(`task-input-container-${taskId}`);
+    const completedContainer = document.getElementById(`task-completed-${taskId}`);
+    const savedResponseEl = document.getElementById(`saved-response-${taskId}`);
+    const waitingEl = document.getElementById(`task-waiting-${taskId}`);
+
+    if (inputContainer) inputContainer.classList.add('hidden');
+    if (waitingEl) waitingEl.classList.add('hidden');
+    if (savedResponseEl) savedResponseEl.textContent = response;
+    if (completedContainer) completedContainer.classList.remove('hidden');
+
+    TASK_STATE.status[taskId] = 'completed';
+}
+
+// ============================================
+// VISUALIZACIÓN DEL TIMER EN TAREAS
+// ============================================
+
+function updateTimerDisplay(taskId, seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    const minutesEl = document.getElementById(`timer-minutes-${taskId}`);
+    const secondsEl = document.getElementById(`timer-seconds-${taskId}`);
+
+    if (minutesEl) minutesEl.textContent = mins.toString().padStart(2, '0');
+    if (secondsEl) secondsEl.textContent = secs.toString().padStart(2, '0');
+}
+
+function showWaitingToStart(taskId) {
+    const timerContainer = document.getElementById(`task-timer-${taskId}`);
+    const waitingEl = document.getElementById(`task-waiting-${taskId}`);
+
+    if (timerContainer) {
+        timerContainer.classList.add('bg-gray-100', 'border-gray-300');
+    }
+    if (waitingEl) {
+        waitingEl.classList.remove('hidden');
+    }
+}
+
+function showTimerActive(taskId) {
+    const timerContainer = document.getElementById(`task-timer-${taskId}`);
+    const waitingEl = document.getElementById(`task-waiting-${taskId}`);
+
+    if (waitingEl) waitingEl.classList.add('hidden');
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-gray-100', 'border-gray-300', 'bg-amber-100', 'border-amber-400', 'bg-red-100', 'border-red-400');
+        timerContainer.classList.add('bg-blue-100', 'border-blue-400');
+    }
+
+    const minutesEl = document.getElementById(`timer-minutes-${taskId}`);
+    const secondsEl = document.getElementById(`timer-seconds-${taskId}`);
+    if (minutesEl) minutesEl.classList.remove('text-amber-600', 'text-red-600');
+    if (secondsEl) secondsEl.classList.remove('text-amber-600', 'text-red-600');
+
+    showHeaderTimerActive();
+}
+
+function showTimerWarning(taskId) {
+    const timerContainer = document.getElementById(`task-timer-${taskId}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-400');
+        timerContainer.classList.add('bg-amber-100', 'border-amber-400');
+    }
+
+    const minutesEl = document.getElementById(`timer-minutes-${taskId}`);
+    const secondsEl = document.getElementById(`timer-seconds-${taskId}`);
+    if (minutesEl) minutesEl.classList.add('text-amber-600');
+    if (secondsEl) secondsEl.classList.add('text-amber-600');
+}
+
+function showTimerCritical(taskId) {
+    const timerContainer = document.getElementById(`task-timer-${taskId}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-400', 'bg-amber-100', 'border-amber-400');
+        timerContainer.classList.add('bg-red-100', 'border-red-400');
+    }
+
+    const minutesEl = document.getElementById(`timer-minutes-${taskId}`);
+    const secondsEl = document.getElementById(`timer-seconds-${taskId}`);
+    if (minutesEl) {
+        minutesEl.classList.remove('text-amber-600');
+        minutesEl.classList.add('text-red-600');
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-amber-600');
+        secondsEl.classList.add('text-red-600');
+    }
+}
+
+function showTaskError(taskId, message) {
+    const errorEl = document.getElementById(`task-error-${taskId}`);
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+        setTimeout(() => errorEl.classList.add('hidden'), 3000);
+    } else {
+        alert(message);
+    }
+}
+
+// ============================================
+// NAVEGACIÓN
+// ============================================
+
+function lockNavigation(stepNum) {
+    const nextBtn = document.getElementById('next-btn');
+    if (nextBtn) {
+        nextBtn.disabled = true;
+        nextBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        nextBtn.innerHTML = '<i class="fas fa-clock mr-2"></i>Espera el tiempo';
+    }
+
+    APP_STATE.stepTimerCompleted[stepNum] = false;
+}
+
+function unlockNavigation(stepNum) {
+    const nextBtn = document.getElementById('next-btn');
+    const totalSteps = CONFIG.STEPS.length;
+
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        if (stepNum === totalSteps) {
+            nextBtn.innerHTML = '<i class="fas fa-check mr-2"></i>Finalizar';
+        } else {
+            nextBtn.innerHTML = 'Siguiente<i class="fas fa-arrow-right ml-2"></i>';
+        }
+    }
+
+    APP_STATE.stepTimerCompleted[stepNum] = true;
+}
+
+function canNavigateToStep(targetStep) {
+    if (targetStep < APP_STATE.currentStep) return true;
+
+    for (let i = APP_STATE.currentStep; i < targetStep; i++) {
+        const step = CONFIG.STEPS[i - 1];
+        if (step && (step.hasTask || step.hasTimer) && step.taskDuration > 0 && !APP_STATE.stepTimerCompleted[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// ============================================
+// PERSISTENCIA
+// ============================================
+
+function getSavedTask(taskId) {
+    return JSON.parse(localStorage.getItem(`task_${CONFIG.MODULE_ID}_${taskId}`) || 'null');
+}
+
+function saveTaskTime(taskId, remaining) {
+    const data = {
+        hasStarted: TASK_STATE.hasStarted[taskId] || false,
+        remaining: remaining,
+        savedAt: Date.now()
+    };
+    localStorage.setItem(`taskTime_${CONFIG.MODULE_ID}_${taskId}`, JSON.stringify(data));
+}
+
+function getSavedTaskTime(taskId) {
+    return JSON.parse(localStorage.getItem(`taskTime_${CONFIG.MODULE_ID}_${taskId}`) || 'null');
+}
+
+function clearSavedTaskTime(taskId) {
+    localStorage.removeItem(`taskTime_${CONFIG.MODULE_ID}_${taskId}`);
+}
+
+function saveStepTime(stepNum, remaining, completed) {
+    const data = {
+        hasStarted: true,
+        remaining: remaining,
+        completed: completed,
+        savedAt: Date.now()
+    };
+    localStorage.setItem(`stepTime_${CONFIG.MODULE_ID}_step${stepNum}`, JSON.stringify(data));
+}
+
+function getSavedStepTime(stepNum) {
+    return JSON.parse(localStorage.getItem(`stepTime_${CONFIG.MODULE_ID}_step${stepNum}`) || 'null');
+}
+
+function loadSavedTasks() {
+    CONFIG.STEPS.forEach(step => {
+        // Cargar tareas con textarea
+        if (step.hasTask && step.taskId) {
+            const savedTask = getSavedTask(step.taskId);
+            if (savedTask && savedTask.completed) {
+                showTaskCompleted(step.taskId, savedTask.response);
+                APP_STATE.stepTimerCompleted[step.id] = true;
+            }
+        }
+
+        // Cargar cronómetros simples completados
+        if (step.hasTimer) {
+            const savedTime = getSavedStepTime(step.id);
+            if (savedTime && savedTime.completed) {
+                APP_STATE.stepTimerCompleted[step.id] = true;
+            }
+        }
+    });
+}
+
+// ============================================
+// CONTADOR DE CARACTERES
+// ============================================
+
+document.addEventListener('input', function(e) {
+    if (e.target.id && e.target.id.startsWith('task-response-')) {
+        const taskId = e.target.id.replace('task-response-', '');
+        const charCountEl = document.getElementById(`char-count-${taskId}`);
+        if (charCountEl) {
+            charCountEl.textContent = `${e.target.value.length} caracteres`;
+        }
+    }
+});

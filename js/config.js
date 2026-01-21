@@ -19,8 +19,8 @@ const CONFIG = {
             title: 'Introducción',
             icon: 'fa-home',
             hasTask: true,
-            taskDuration: 0,
-            taskId: 'step1-diagrama'
+            taskDuration: 900,
+            taskId: 'step1-diagrama' // 15 minutos
         },
         {
             id: 2,

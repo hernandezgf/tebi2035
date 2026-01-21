@@ -1,0 +1,107 @@
+================================================================================
+GUIA DE IMAGENES A EXTRAER DEL PDF
+"Introduccion a los conceptos de medicion.pdf"
+================================================================================
+
+INSTRUCCIONES:
+1. Abre el PDF con Adobe Acrobat, Foxit Reader, o cualquier editor de PDF
+2. Extrae las siguientes imagenes (clic derecho > Guardar imagen como...)
+3. Guardalas en esta carpeta "images" con los nombres indicados
+
+================================================================================
+IMAGENES PRIORITARIAS (Modulo 1A - Conceptos de Medicion)
+================================================================================
+
+PAGINA 3 - Sistema de Medida (IMPORTANTE)
+- Nombre archivo: sistema_medida_diagrama.png
+- Descripcion: Diagrama de bloques mostrando Entrada > Adquisicion >
+  Procesamiento > Distribucion > Salida
+- Uso: Seccion de introduccion a sistemas de medida
+
+PAGINA 8 - Precision y Exactitud (IMPORTANTE)
+- Nombre archivo: precision_exactitud_dianas.png
+- Descripcion: Tres dianas mostrando los conceptos de Accurate, Precise,
+  y Accurate & Precise
+- Uso: Seccion de Precision y Exactitud
+
+PAGINA 10 - Relacion Precision/Exactitud
+- Nombre archivo: precision_exactitud_casos.png
+- Descripcion: Tres casos con dianas: Preciso y No Exacto, Preciso y Exacto,
+  No Preciso y No Exacto
+- Uso: Complemento para seccion de Precision y Exactitud
+
+PAGINA 14 - Instrumentos de Medicion
+- Nombre archivo: instrumentos_sensibilidad.png
+- Descripcion: Micrometros digitales mostrando sensibilidad
+- Uso: Seccion de Sensibilidad
+
+PAGINA 17 - Balanza de Precision
+- Nombre archivo: balanza_precision.png
+- Descripcion: Imagen de balanza digital de precision
+- Uso: Ejemplos de instrumentos de medicion
+
+================================================================================
+IMAGENES PARA MODULO 1B (Transductores y Sensores)
+================================================================================
+
+PAGINA 33 - Nueva Generacion de Sensores
+- Nombre archivo: sensores_nueva_generacion.png
+- Descripcion: Sensores flexibles y biosensores modernos
+- Uso: Seccion de Biosensores
+
+PAGINA 34 - Diagrama Biosensor
+- Nombre archivo: biosensor_diagrama.png
+- Descripcion: Esquema de biosensor con Muestra > Detector > Transductor >
+  Equipo de medicion
+- Uso: Seccion de Biosensores
+
+PAGINA 35 - Componentes Biosensor
+- Nombre archivo: biosensor_componentes.png
+- Descripcion: Diagrama detallado de bioreceptores, transductores y
+  acondicionamiento de senal
+- Uso: Seccion de Biosensores
+
+PAGINA 38 - Biosensor Glucosa
+- Nombre archivo: biosensor_glucosa.png
+- Descripcion: Ejemplo de biosensor para glucosa con electrodos de carbon
+- Uso: Ejemplo practico de biosensor
+
+================================================================================
+IMAGENES DE APOYO (OPCIONALES)
+================================================================================
+
+PAGINA 5 - Sistema de Medida Biomedica
+- Nombre archivo: sistema_biomedico.png
+- Descripcion: Diagrama con ECG y Display
+
+PAGINA 6-7 - Tablas de Senales Fisiologicas
+- Nombre archivo: tabla_senales_fisiologicas.png
+- Descripcion: Tabla con parametros, rangos y metodos de medida
+- NOTA: Esta tabla ya esta recreada en HTML
+
+PAGINA 39 - Senal con Ruido
+- Nombre archivo: senal_ruido_ejemplo.png
+- Descripcion: Grafica mostrando senal original, ruido y senal final
+
+PAGINA 41 - Rutas de Transmision
+- Nombre archivo: rutas_transmision.png
+- Descripcion: Diagrama de sistema basico vs telemetrico
+
+================================================================================
+HERRAMIENTAS RECOMENDADAS PARA EXTRAER IMAGENES
+================================================================================
+
+1. Adobe Acrobat Pro: Herramientas > Exportar PDF > Imagen
+2. Foxit Reader: Convertir > A imagen
+3. Online: smallpdf.com, ilovepdf.com (subir PDF, extraer imagenes)
+4. Snipping Tool de Windows: Capturar directamente de la pantalla
+
+================================================================================
+FORMATO RECOMENDADO
+================================================================================
+
+- PNG para imagenes con texto o diagramas (mejor calidad)
+- JPG para fotografias (menor tamano)
+- Resolucion minima recomendada: 300 DPI o 1200px de ancho
+
+================================================================================

@@ -21,15 +21,24 @@ const TASK_STATE = {
  * Inicializa el sistema para un paso específico
  */
 function initStepTimer(stepNum) {
+    console.log('[TIMER] initStepTimer llamado para step:', stepNum);
     const step = CONFIG.STEPS[stepNum - 1];
-    if (!step) return;
+    if (!step) {
+        console.log('[TIMER] Step no encontrado');
+        return;
+    }
+
+    console.log('[TIMER] Step config:', JSON.stringify(step));
 
     // Determinar el tipo de cronómetro
     if (step.hasTask && step.taskDuration > 0) {
+        console.log('[TIMER] Iniciando TaskSystem (hasTask)');
         initTaskSystem(stepNum);
     } else if (step.hasTimer && step.taskDuration > 0) {
+        console.log('[TIMER] Iniciando SimpleTimer (hasTimer)');
         initSimpleTimer(stepNum);
     } else {
+        console.log('[TIMER] Sin cronómetro - desbloqueando navegación');
         // Sin cronómetro - desbloquear navegación
         unlockNavigation(stepNum);
     }
@@ -42,9 +51,13 @@ function initTaskSystem(stepNum) {
     const step = CONFIG.STEPS[stepNum - 1];
     const taskId = step.taskId;
 
+    console.log('[TASK] initTaskSystem para step:', stepNum, 'taskId:', taskId);
+
     // Verificar si la tarea ya fue completada
     const savedTask = getSavedTask(taskId);
+    console.log('[TASK] Tarea guardada:', savedTask);
     if (savedTask && savedTask.completed) {
+        console.log('[TASK] Tarea ya completada, mostrando estado completado');
         showTaskCompleted(taskId, savedTask.response);
         unlockNavigation(stepNum);
         return;
@@ -52,9 +65,11 @@ function initTaskSystem(stepNum) {
 
     // Verificar si hay tiempo guardado
     const savedTime = getSavedTaskTime(taskId);
+    console.log('[TASK] Tiempo guardado:', savedTime);
     if (savedTime && savedTime.hasStarted) {
         const elapsed = Math.floor((Date.now() - savedTime.savedAt) / 1000);
         const remaining = Math.max(0, savedTime.remaining - elapsed);
+        console.log('[TASK] Continuando timer - elapsed:', elapsed, 'remaining:', remaining);
 
         if (remaining > 0) {
             TASK_STATE.hasStarted[taskId] = true;
@@ -66,10 +81,12 @@ function initTaskSystem(stepNum) {
             completeTaskByTimeout(taskId, stepNum);
         }
     } else {
+        console.log('[TASK] Configurando trigger de escritura, duración:', step.taskDuration);
         TASK_STATE.remainingTimes[taskId] = step.taskDuration;
         setupWritingTrigger(taskId, stepNum);
     }
 
+    console.log('[TASK] Bloqueando navegación');
     lockNavigation(stepNum);
 }
 
@@ -222,13 +239,20 @@ function hideHeaderTimer() {
 // ============================================
 
 function setupWritingTrigger(taskId, stepNum) {
+    console.log('[TRIGGER] Buscando textarea con id:', `task-response-${taskId}`);
     const textarea = document.getElementById(`task-response-${taskId}`);
-    if (!textarea) return;
+    if (!textarea) {
+        console.error('[TRIGGER] ERROR: Textarea NO encontrado!');
+        return;
+    }
+    console.log('[TRIGGER] Textarea encontrado:', textarea);
 
     showWaitingToStart(taskId);
 
     const startHandler = function(e) {
+        console.log('[TRIGGER] Input detectado, valor length:', textarea.value.length);
         if (!TASK_STATE.hasStarted[taskId] && textarea.value.length > 0) {
+            console.log('[TRIGGER] Iniciando countdown!');
             TASK_STATE.hasStarted[taskId] = true;
             textarea.removeEventListener('input', startHandler);
 
@@ -239,9 +263,12 @@ function setupWritingTrigger(taskId, stepNum) {
     };
 
     textarea.addEventListener('input', startHandler);
+    console.log('[TRIGGER] Event listener agregado al textarea');
 }
 
 function startCountdown(taskId, stepNum, duration, isTask) {
+    console.log('[COUNTDOWN] Iniciando countdown - taskId:', taskId, 'duration:', duration, 'isTask:', isTask);
+
     if (TASK_STATE.timers[taskId]) {
         clearInterval(TASK_STATE.timers[taskId]);
     }
@@ -253,6 +280,7 @@ function startCountdown(taskId, stepNum, duration, isTask) {
     saveTaskTime(taskId, duration);
     updateTimerDisplay(taskId, duration);
     updateHeaderTimer(duration);
+    console.log('[COUNTDOWN] Timer display actualizado');
 
     TASK_STATE.timers[taskId] = setInterval(() => {
         TASK_STATE.remainingTimes[taskId]--;
@@ -415,11 +443,15 @@ function showTaskError(taskId, message) {
 // ============================================
 
 function lockNavigation(stepNum) {
+    console.log('[NAV] lockNavigation para step:', stepNum);
     const nextBtn = document.getElementById('next-btn');
     if (nextBtn) {
+        console.log('[NAV] Botón siguiente encontrado, deshabilitando');
         nextBtn.disabled = true;
         nextBtn.classList.add('opacity-50', 'cursor-not-allowed');
         nextBtn.innerHTML = '<i class="fas fa-clock mr-2"></i>Espera el tiempo';
+    } else {
+        console.error('[NAV] ERROR: Botón siguiente NO encontrado!');
     }
 
     APP_STATE.stepTimerCompleted[stepNum] = false;

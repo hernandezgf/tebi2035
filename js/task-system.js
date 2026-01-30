@@ -31,7 +31,11 @@ async function initStepTimer(stepNum) {
     console.log('[TIMER] Step config:', JSON.stringify(step));
 
     // Determinar el tipo de cronómetro
-    if (step.hasTask && step.taskDuration > 0) {
+    // Caso especial: Doble timer (video + tarea)
+    if (step.hasVideoTimer && step.hasTask) {
+        console.log('[TIMER] Iniciando DualTimer (video + tarea)');
+        await initDualTimerSystem(stepNum);
+    } else if (step.hasTask && step.taskDuration > 0) {
         console.log('[TIMER] Iniciando TaskSystem (hasTask)');
         await initTaskSystem(stepNum);
     } else if (step.hasTimer && step.taskDuration > 0) {
@@ -109,6 +113,8 @@ function initSimpleTimer(stepNum) {
     if (savedTime && savedTime.completed) {
         unlockNavigation(stepNum);
         hideHeaderTimer();
+        showStepTimerComplete(stepNum);
+        updateStepTimerDisplay(stepNum, 0);
         return;
     }
 
@@ -133,6 +139,305 @@ function initSimpleTimer(stepNum) {
 }
 
 // ============================================
+// SISTEMA DE DOBLE TIMER (Video + Tarea)
+// ============================================
+
+/**
+ * Inicializa el sistema de doble timer (primero video, luego tarea)
+ */
+async function initDualTimerSystem(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    const taskId = step.taskId;
+    const videoTimerId = `video-step${stepNum}`;
+
+    console.log('[DUAL] initDualTimerSystem para step:', stepNum);
+
+    // Verificar si la tarea ya fue completada
+    const savedTask = getSavedTask(taskId);
+    if (savedTask && savedTask.completed) {
+        console.log('[DUAL] Tarea ya completada');
+        showVideoTimerComplete(stepNum);
+        showTaskSectionUnlocked(stepNum);
+        showTaskCompleted(taskId, savedTask.response);
+        unlockNavigation(stepNum);
+        return;
+    }
+
+    // Verificar si el timer del video ya se completó
+    const savedVideoTime = getSavedVideoTime(stepNum);
+    if (savedVideoTime && savedVideoTime.completed) {
+        console.log('[DUAL] Timer de video ya completado, iniciando sistema de tarea');
+        showVideoTimerComplete(stepNum);
+        showTaskSectionUnlocked(stepNum);
+        await initTaskSystemAfterVideo(stepNum);
+        return;
+    }
+
+    // Ocultar sección de tarea mientras corre el timer del video
+    hideTaskSection(stepNum);
+
+    // Verificar si hay tiempo de video guardado
+    if (savedVideoTime && savedVideoTime.hasStarted) {
+        const elapsed = Math.floor((Date.now() - savedVideoTime.savedAt) / 1000);
+        const remaining = Math.max(0, savedVideoTime.remaining - elapsed);
+        console.log('[DUAL] Continuando video timer - remaining:', remaining);
+
+        if (remaining > 0) {
+            TASK_STATE.hasStarted[videoTimerId] = true;
+            startVideoCountdown(stepNum, remaining);
+        } else {
+            completeVideoTimer(stepNum);
+        }
+    } else {
+        // Iniciar timer del video automáticamente
+        console.log('[DUAL] Iniciando timer de video:', step.videoDuration, 'segundos');
+        TASK_STATE.hasStarted[videoTimerId] = true;
+        startVideoCountdown(stepNum, step.videoDuration);
+    }
+
+    lockNavigation(stepNum);
+}
+
+/**
+ * Inicia el countdown del video
+ */
+function startVideoCountdown(stepNum, duration) {
+    const videoTimerId = `video-step${stepNum}`;
+
+    if (TASK_STATE.timers[videoTimerId]) {
+        clearInterval(TASK_STATE.timers[videoTimerId]);
+    }
+
+    TASK_STATE.remainingTimes[videoTimerId] = duration;
+    TASK_STATE.startTimes[videoTimerId] = Date.now();
+    TASK_STATE.status[videoTimerId] = 'in_progress';
+
+    saveVideoTime(stepNum, duration, false);
+    updateVideoTimerDisplay(stepNum, duration);
+    updateHeaderTimer(duration);
+    showVideoTimerActive(stepNum);
+    showHeaderTimerActive();
+
+    TASK_STATE.timers[videoTimerId] = setInterval(() => {
+        TASK_STATE.remainingTimes[videoTimerId]--;
+        const remaining = TASK_STATE.remainingTimes[videoTimerId];
+
+        updateVideoTimerDisplay(stepNum, remaining);
+        updateHeaderTimer(remaining);
+        saveVideoTime(stepNum, remaining, false);
+
+        // Cambiar estilo según tiempo restante
+        if (remaining <= 120 && remaining > 60) {
+            showVideoTimerWarning(stepNum);
+            showHeaderTimerWarning();
+        } else if (remaining <= 60) {
+            showVideoTimerCritical(stepNum);
+            showHeaderTimerCritical();
+        }
+
+        if (remaining <= 0) {
+            clearInterval(TASK_STATE.timers[videoTimerId]);
+            TASK_STATE.timers[videoTimerId] = null;
+            completeVideoTimer(stepNum);
+        }
+    }, 1000);
+}
+
+/**
+ * Completa el timer del video y desbloquea la sección de tarea
+ */
+async function completeVideoTimer(stepNum) {
+    const videoTimerId = `video-step${stepNum}`;
+    TASK_STATE.status[videoTimerId] = 'completed';
+    saveVideoTime(stepNum, 0, true);
+
+    showVideoTimerComplete(stepNum);
+    showHeaderTimerComplete();
+
+    // Mostrar y desbloquear la sección de tarea
+    showTaskSectionUnlocked(stepNum);
+
+    // Iniciar el sistema de tarea
+    await initTaskSystemAfterVideo(stepNum);
+}
+
+/**
+ * Inicializa el sistema de tareas después de que termine el video
+ */
+async function initTaskSystemAfterVideo(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    const taskId = step.taskId;
+
+    console.log('[DUAL] Iniciando sistema de tarea después del video');
+
+    // Verificar si la tarea ya fue completada
+    const savedTask = getSavedTask(taskId);
+    if (savedTask && savedTask.completed) {
+        showTaskCompleted(taskId, savedTask.response);
+        unlockNavigation(stepNum);
+        return;
+    }
+
+    // Verificar si hay tiempo de tarea guardado
+    const savedTime = getSavedTaskTime(taskId);
+    if (savedTime && savedTime.hasStarted) {
+        const elapsed = Math.floor((Date.now() - savedTime.savedAt) / 1000);
+        const remaining = Math.max(0, savedTime.remaining - elapsed);
+
+        if (remaining > 0) {
+            TASK_STATE.hasStarted[taskId] = true;
+            TASK_STATE.remainingTimes[taskId] = remaining;
+            startCountdown(taskId, stepNum, remaining, true);
+            updateTimerDisplay(taskId, remaining);
+            showTimerActive(taskId);
+        } else {
+            completeTaskByTimeout(taskId, stepNum);
+        }
+    } else {
+        TASK_STATE.remainingTimes[taskId] = step.taskDuration;
+        setupWritingTrigger(taskId, stepNum);
+    }
+}
+
+// Funciones de UI para el timer del video
+
+function updateVideoTimerDisplay(stepNum, seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    const minutesEl = document.getElementById(`video-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`video-timer-seconds-step${stepNum}`);
+
+    if (minutesEl) minutesEl.textContent = mins.toString().padStart(2, '0');
+    if (secondsEl) secondsEl.textContent = secs.toString().padStart(2, '0');
+}
+
+function showVideoTimerActive(stepNum) {
+    const timerContainer = document.getElementById(`video-timer-step${stepNum}`);
+    const messageEl = document.getElementById(`video-timer-message-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-amber-100', 'border-amber-300', 'bg-red-100', 'border-red-300', 'bg-green-100', 'border-green-300');
+        timerContainer.classList.add('bg-blue-100', 'border-blue-300');
+    }
+
+    if (messageEl) {
+        messageEl.innerHTML = '<i class="fas fa-play-circle mr-2"></i>Mira el video completo. La tarea se desbloqueara cuando termine el tiempo.';
+    }
+}
+
+function showVideoTimerWarning(stepNum) {
+    const timerContainer = document.getElementById(`video-timer-step${stepNum}`);
+    const minutesEl = document.getElementById(`video-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`video-timer-seconds-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-300', 'bg-red-100', 'border-red-300');
+        timerContainer.classList.add('bg-amber-100', 'border-amber-300');
+    }
+
+    if (minutesEl) {
+        minutesEl.classList.remove('text-blue-600', 'text-red-600');
+        minutesEl.classList.add('text-amber-600');
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-blue-600', 'text-red-600');
+        secondsEl.classList.add('text-amber-600');
+    }
+}
+
+function showVideoTimerCritical(stepNum) {
+    const timerContainer = document.getElementById(`video-timer-step${stepNum}`);
+    const minutesEl = document.getElementById(`video-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`video-timer-seconds-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-300', 'bg-amber-100', 'border-amber-300');
+        timerContainer.classList.add('bg-red-100', 'border-red-300');
+    }
+
+    if (minutesEl) {
+        minutesEl.classList.remove('text-blue-600', 'text-amber-600');
+        minutesEl.classList.add('text-red-600');
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-blue-600', 'text-amber-600');
+        secondsEl.classList.add('text-red-600');
+    }
+}
+
+function showVideoTimerComplete(stepNum) {
+    const timerContainer = document.getElementById(`video-timer-step${stepNum}`);
+    const messageEl = document.getElementById(`video-timer-message-step${stepNum}`);
+    const completeEl = document.getElementById(`video-timer-complete-step${stepNum}`);
+    const minutesEl = document.getElementById(`video-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`video-timer-seconds-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-300', 'bg-amber-100', 'border-amber-300', 'bg-red-100', 'border-red-300');
+        timerContainer.classList.add('bg-green-100', 'border-green-300');
+    }
+
+    if (minutesEl) {
+        minutesEl.classList.remove('text-blue-600', 'text-amber-600', 'text-red-600');
+        minutesEl.classList.add('text-green-600');
+        minutesEl.textContent = '00';
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-blue-600', 'text-amber-600', 'text-red-600');
+        secondsEl.classList.add('text-green-600');
+        secondsEl.textContent = '00';
+    }
+
+    if (messageEl) messageEl.classList.add('hidden');
+    if (completeEl) completeEl.classList.remove('hidden');
+}
+
+function hideTaskSection(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    const taskSection = document.getElementById(`task-section-${step.taskId}`);
+    if (taskSection) {
+        taskSection.classList.add('opacity-50', 'pointer-events-none');
+        // Agregar overlay de bloqueo
+        let overlay = document.getElementById(`task-locked-overlay-step${stepNum}`);
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = `task-locked-overlay-step${stepNum}`;
+            overlay.className = 'absolute inset-0 bg-gray-200 bg-opacity-50 rounded-xl flex items-center justify-center';
+            overlay.innerHTML = '<div class="bg-white px-6 py-4 rounded-lg shadow-lg text-center"><i class="fas fa-lock text-gray-400 text-3xl mb-2"></i><p class="text-gray-600 font-medium">Primero mira el video completo</p></div>';
+            taskSection.style.position = 'relative';
+            taskSection.appendChild(overlay);
+        }
+    }
+}
+
+function showTaskSectionUnlocked(stepNum) {
+    const step = CONFIG.STEPS[stepNum - 1];
+    const taskSection = document.getElementById(`task-section-${step.taskId}`);
+    if (taskSection) {
+        taskSection.classList.remove('opacity-50', 'pointer-events-none');
+        const overlay = document.getElementById(`task-locked-overlay-step${stepNum}`);
+        if (overlay) overlay.remove();
+    }
+}
+
+// Persistencia para el timer del video
+
+function saveVideoTime(stepNum, remaining, completed) {
+    const data = {
+        hasStarted: true,
+        remaining: remaining,
+        completed: completed,
+        savedAt: Date.now()
+    };
+    localStorage.setItem(`videoTime_${CONFIG.MODULE_ID}_step${stepNum}`, JSON.stringify(data));
+}
+
+function getSavedVideoTime(stepNum) {
+    return JSON.parse(localStorage.getItem(`videoTime_${CONFIG.MODULE_ID}_step${stepNum}`) || 'null');
+}
+
+// ============================================
 // CRONÓMETRO SIMPLE (Solo tiempo mínimo)
 // ============================================
 
@@ -149,20 +454,25 @@ function startSimpleCountdown(stepNum, duration) {
 
     saveStepTime(stepNum, duration, false);
     updateHeaderTimer(duration);
+    updateStepTimerDisplay(stepNum, duration);
     showHeaderTimerActive();
+    showStepTimerActive(stepNum);
 
     TASK_STATE.timers[timerId] = setInterval(() => {
         TASK_STATE.remainingTimes[timerId]--;
         const remaining = TASK_STATE.remainingTimes[timerId];
 
         updateHeaderTimer(remaining);
+        updateStepTimerDisplay(stepNum, remaining);
         saveStepTime(stepNum, remaining, false);
 
         // Cambiar estilo según tiempo restante
         if (remaining <= 120 && remaining > 60) {
             showHeaderTimerWarning();
+            showStepTimerWarning(stepNum);
         } else if (remaining <= 60) {
             showHeaderTimerCritical();
+            showStepTimerCritical(stepNum);
         }
 
         if (remaining <= 0) {
@@ -179,6 +489,101 @@ function completeSimpleTimer(stepNum) {
     saveStepTime(stepNum, 0, true);
     unlockNavigation(stepNum);
     showHeaderTimerComplete();
+    showStepTimerComplete(stepNum);
+}
+
+// ============================================
+// FUNCIONES DEL STEP TIMER (Timer visible en el step)
+// ============================================
+
+function updateStepTimerDisplay(stepNum, seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+
+    const minutesEl = document.getElementById(`step-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`step-timer-seconds-step${stepNum}`);
+
+    if (minutesEl) minutesEl.textContent = mins.toString().padStart(2, '0');
+    if (secondsEl) secondsEl.textContent = secs.toString().padStart(2, '0');
+}
+
+function showStepTimerActive(stepNum) {
+    const timerContainer = document.getElementById(`step-timer-step${stepNum}`);
+    const messageEl = document.getElementById(`step-timer-message-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-amber-100', 'border-amber-300', 'bg-red-100', 'border-red-300', 'bg-green-100', 'border-green-300');
+        timerContainer.classList.add('bg-blue-100', 'border-blue-300');
+    }
+
+    if (messageEl) {
+        messageEl.innerHTML = '<i class="fas fa-play-circle mr-2"></i>El cronometro esta en marcha. Estudia el contenido.';
+    }
+}
+
+function showStepTimerWarning(stepNum) {
+    const timerContainer = document.getElementById(`step-timer-step${stepNum}`);
+    const minutesEl = document.getElementById(`step-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`step-timer-seconds-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-300', 'bg-red-100', 'border-red-300');
+        timerContainer.classList.add('bg-amber-100', 'border-amber-300');
+    }
+
+    if (minutesEl) {
+        minutesEl.classList.remove('text-blue-600', 'text-red-600');
+        minutesEl.classList.add('text-amber-600');
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-blue-600', 'text-red-600');
+        secondsEl.classList.add('text-amber-600');
+    }
+}
+
+function showStepTimerCritical(stepNum) {
+    const timerContainer = document.getElementById(`step-timer-step${stepNum}`);
+    const minutesEl = document.getElementById(`step-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`step-timer-seconds-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-300', 'bg-amber-100', 'border-amber-300');
+        timerContainer.classList.add('bg-red-100', 'border-red-300');
+    }
+
+    if (minutesEl) {
+        minutesEl.classList.remove('text-blue-600', 'text-amber-600');
+        minutesEl.classList.add('text-red-600');
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-blue-600', 'text-amber-600');
+        secondsEl.classList.add('text-red-600');
+    }
+}
+
+function showStepTimerComplete(stepNum) {
+    const timerContainer = document.getElementById(`step-timer-step${stepNum}`);
+    const messageEl = document.getElementById(`step-timer-message-step${stepNum}`);
+    const completeEl = document.getElementById(`step-timer-complete-step${stepNum}`);
+    const minutesEl = document.getElementById(`step-timer-minutes-step${stepNum}`);
+    const secondsEl = document.getElementById(`step-timer-seconds-step${stepNum}`);
+
+    if (timerContainer) {
+        timerContainer.classList.remove('bg-blue-100', 'border-blue-300', 'bg-amber-100', 'border-amber-300', 'bg-red-100', 'border-red-300');
+        timerContainer.classList.add('bg-green-100', 'border-green-300');
+    }
+
+    if (minutesEl) {
+        minutesEl.classList.remove('text-blue-600', 'text-amber-600', 'text-red-600');
+        minutesEl.classList.add('text-green-600');
+    }
+    if (secondsEl) {
+        secondsEl.classList.remove('text-blue-600', 'text-amber-600', 'text-red-600');
+        secondsEl.classList.add('text-green-600');
+    }
+
+    if (messageEl) messageEl.classList.add('hidden');
+    if (completeEl) completeEl.classList.remove('hidden');
 }
 
 // ============================================
@@ -550,6 +955,16 @@ function loadSavedTasks() {
             const savedTime = getSavedStepTime(step.id);
             if (savedTime && savedTime.completed) {
                 APP_STATE.stepTimerCompleted[step.id] = true;
+            }
+        }
+
+        // Cargar estado de video timer para pasos con doble timer
+        if (step.hasVideoTimer) {
+            const savedVideoTime = getSavedVideoTime(step.id);
+            if (savedVideoTime && savedVideoTime.completed) {
+                // El video timer está completo, mostrar estado visual
+                showVideoTimerComplete(step.id);
+                showTaskSectionUnlocked(step.id);
             }
         }
     });

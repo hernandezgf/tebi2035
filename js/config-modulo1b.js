@@ -22,30 +22,32 @@ const CONFIG = {
             id: 1,
             title: 'Introducción',
             icon: 'fa-home',
-            hasTimer: false,  // PRUEBA: sin timer
-            taskDuration: 0
+            hasTimer: true,
+            taskDuration: 720  // 12 minutos (video de 10 min + 2 min extra)
         },
         {
             id: 2,
             title: 'Sensores vs Transductores',
             icon: 'fa-exchange-alt',
             hasTask: true,
-            taskDuration: 60,  // PRUEBA: 1 minuto
+            taskDuration: 720,  // 12 minutos
             taskId: 'step2-diferencias'
         },
         {
             id: 3,
             title: 'Características',
             icon: 'fa-sliders-h',
-            hasTimer: false,  // PRUEBA: sin timer
-            taskDuration: 0
+            hasTimer: true,
+            taskDuration: 720  // 12 minutos
         },
         {
             id: 4,
             title: 'Tipos de Transductores',
             icon: 'fa-sitemap',
-            hasTask: true,
-            taskDuration: 60,  // PRUEBA: 1 minuto
+            hasVideoTimer: true,      // Timer para ver el video primero
+            videoDuration: 1800,      // 30 minutos para el video
+            hasTask: true,            // Luego tiene tarea escrita
+            taskDuration: 600,        // 10 minutos para escribir
             taskId: 'step4-clasificacion'
         },
         {
@@ -59,8 +61,10 @@ const CONFIG = {
             id: 6,
             title: 'Biosensores',
             icon: 'fa-dna',
-            hasTask: true,
-            taskDuration: 60,  // PRUEBA: 1 minuto
+            hasVideoTimer: true,      // Timer para ver el video primero
+            videoDuration: 840,       // 14 minutos para el video
+            hasTask: true,            // Luego tiene tarea escrita
+            taskDuration: 600,        // 10 minutos para escribir
             taskId: 'step6-biosensor'
         },
         {

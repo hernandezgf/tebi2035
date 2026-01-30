@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Módulo 1B: Transductores y Sensores - TEBI 2035</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .step-content { display: none; animation: fadeIn 0.5s ease-in-out; }
+        .step-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .stepper-item.completed .stepper-circle { background-color: #10b981; border-color: #10b981; }
+        .stepper-item.active .stepper-circle { background-color: #3b82f6; border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3); }
+        .stepper-item .stepper-circle { transition: all 0.3s ease; }
+        .concept-card { transition: all 0.3s ease; }
+        .concept-card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15); }
+        .scale-card { border-left: 4px solid; }
+        .quiz-option { transition: all 0.2s ease; }
+        .quiz-option:hover:not(.selected):not(.correct):not(.incorrect) { background-color: #f0f9ff; border-color: #3b82f6; }
+        .quiz-option.selected { background-color: #dbeafe; border-color: #3b82f6; }
+        .quiz-option.correct { background-color: #d1fae5; border-color: #10b981; }
+        .quiz-option.incorrect { background-color: #fee2e2; border-color: #ef4444; }
+        .progress-bar { transition: width 0.5s ease; }
+        .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; }
+        .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        .timer-badge { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .timer-locked { cursor: not-allowed !important; opacity: 0.6; }
+
+        /* Modal de Login */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        .modal-content { background: white; border-radius: 1rem; padding: 2rem; max-width: 400px; width: 90%; box-shadow: 0 25px 50px rgba(0,0,0,0.25); animation: modalIn 0.3s ease; }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .modal-hidden { display: none !important; }
+        .sync-indicator { position: fixed; bottom: 20px; right: 20px; padding: 10px 16px; border-radius: 8px; font-size: 0.875rem; z-index: 100; transition: all 0.3s ease; }
+        .sync-saving { background: #fef3c7; color: #92400e; }
+        .sync-saved { background: #d1fae5; color: #065f46; }
+        .sync-error { background: #fee2e2; color: #991b1b; }
+        .user-badge { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Modal de Login -->
+    <div id="login-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-microchip text-green-600 text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">Bienvenido</h2>
+                <p class="text-gray-600 text-sm mt-1">TEBI 2035 - Módulo 1B</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="student-id" class="block text-sm font-medium text-gray-700 mb-1">ID de Estudiante</label>
+                    <input type="text" id="student-id" placeholder="Ej: A12345" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" required>
+                </div>
+                <div id="login-error" class="hidden text-red-600 text-sm bg-red-50 p-3 rounded-lg">
+                    <i class="fas fa-exclamation-circle mr-2"></i><span></span>
+                </div>
+                <button type="submit" id="login-btn" class="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                    <span>Ingresar</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+            <p class="text-xs text-gray-500 text-center mt-4">Tu progreso se guardará automáticamente</p>
+        </div>
+    </div>
+
+    <!-- Indicador de sincronización -->
+    <div id="sync-indicator" class="sync-indicator modal-hidden">
+        <i class="fas fa-sync-alt mr-2"></i><span>Guardando...</span>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-green-700 to-green-900 text-white shadow-lg">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold">TEBI 2035</h1>
+                    <p class="text-green-200 text-sm md:text-base">Biometría Médica y Transducción</p>
+                </div>
+                <div class="mt-4 md:mt-0 text-right">
+                    <div id="user-info" class="hidden mb-2">
+                        <span class="user-badge"><i class="fas fa-user"></i><span id="user-name">Estudiante</span></span>
+                    </div>
+                    <p class="text-sm text-green-200">Instituto Tecnológico de Puerto Rico</p>
+                    <p class="text-xs text-green-300">Prof. Felipe Hernández Gerena</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Progress Bar -->
+    <div class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-600">Progreso del módulo</span>
+                <span id="progress-text" class="text-sm font-semibold text-green-600">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="progress-bar" class="progress-bar bg-green-600 h-2 rounded-full" style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <div class="flex flex-col lg:flex-row gap-8">
+
+            <!-- Stepper Sidebar -->
+            <aside class="lg:w-1/4">
+                <div class="bg-white rounded-xl shadow-md p-6 sticky top-24">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                        <i class="fas fa-list-ol mr-2 text-green-600"></i>Contenido
+                    </h3>
+                    <div class="space-y-4" id="stepper"></div>
+                </div>
+            </aside>
+
+            <!-- Content Area -->
+            <section class="lg:w-3/4">
+                <div class="bg-white rounded-xl shadow-md p-6 md:p-8">
+
+                    <!-- Step 1: Introducción -->
+                    <div class="step-content active" data-step="1">
+                        <div class="mb-8">
+                            <span class="inline-block px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium mb-4">Unidad I - Módulo 1B</span>
+                            <h2 class="text-3xl font-bold text-gray-800 mb-4">Transductores y Sensores</h2>
+                            <p class="text-gray-600 text-lg">En este módulo aprenderás sobre los elementos fundamentales que permiten convertir señales fisiológicas en señales eléctricas medibles.</p>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl p-6 mb-8">
+                            <h3 class="text-xl font-semibold mb-3"><i class="fas fa-bullseye mr-2"></i>Objetivos de Aprendizaje</h3>
+                            <ul class="space-y-2">
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Comprender la diferencia entre sensores y transductores</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Conocer las características de los transductores biomédicos</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Identificar los tipos de transductores (activos y pasivos)</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Entender el funcionamiento de los biosensores</span></li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1"></i><span>Conocer aplicaciones de transductores en biometría médica</span></li>
+                            </ul>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="concept-card bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6">
+                                <div class="text-green-600 text-3xl mb-3"><i class="fas fa-microchip"></i></div>
+                                <h4 class="font-semibold text-gray-800 mb-2">¿Por qué son importantes?</h4>
+                                <p class="text-gray-600 text-sm">Los transductores son el puente entre el mundo físico/biológico y los sistemas de medición electrónicos.</p>
+                            </div>
+                            <div class="concept-card bg-gradient-to-br from-teal-50 to-teal-100 rounded-xl p-6">
+                                <div class="text-teal-600 text-3xl mb-3"><i class="fas fa-heartbeat"></i></div>
+                                <h4 class="font-semibold text-gray-800 mb-2">Aplicación Biomédica</h4>
+                                <p class="text-gray-600 text-sm">Permiten medir señales fisiológicas como ECG, presión arterial, temperatura y glucosa.</p>
+                            </div>
+                        </div>
+
+                        <!-- Imagen: Sensores de Nueva Generación -->
+                        <div class="bg-white rounded-xl p-6 border border-green-200 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4 text-center"><i class="fas fa-microchip mr-2 text-green-600"></i>Sensores de Nueva Generación</h4>
+                            <div class="flex justify-center">
+                                <img src="images/sensores_nueva_generacion.png" alt="Sensores de Nueva Generación" class="max-w-full h-auto rounded-lg shadow-md" style="max-height: 300px;">
+                            </div>
+                            <p class="text-xs text-gray-500 text-center mt-3"><i class="fas fa-book mr-1"></i>Fuente: Material del curso TEBI 2035</p>
+                        </div>
+
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-8">
+                            <p class="text-yellow-800"><i class="fas fa-lightbulb mr-2"></i><strong>Prerrequisito:</strong> Para este módulo, es importante haber completado el Módulo 1A donde aprendiste los conceptos básicos de medición.</p>
+                        </div>
+
+                        <!-- Video introductorio -->
+                        <div class="bg-gray-100 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fab fa-youtube mr-2 text-red-500"></i>Video: Introducción a Sensores y Transductores</h4>
+                            <div class="video-container rounded-lg overflow-hidden shadow-lg">
+                                <iframe src="https://www.youtube.com/embed/VQoQVl4TxO8" title="Introducción a Sensores y Transductores" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>Este video te dará una visión general de los conceptos que estudiaremos en este módulo</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Sensores vs Transductores -->
+                    <div class="step-content" data-step="2">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-exchange-alt mr-3 text-green-600"></i>Sensores y Transductores</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Aunque a menudo se usan de forma intercambiable, estos términos tienen diferencias importantes.</p>
+
+                        <div class="grid md:grid-cols-2 gap-8 mb-8">
+                            <div class="bg-white border-2 border-blue-200 rounded-xl p-6 hover:border-blue-400 transition-colors">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-satellite-dish text-blue-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-xl font-semibold text-gray-800">Sensor</h3>
+                                </div>
+                                <p class="text-gray-600 mb-4">Dispositivo que <strong>detecta</strong> o <strong>responde</strong> a una señal o estímulo físico. Es el elemento que está en contacto directo con la magnitud a medir.</p>
+                                <div class="bg-blue-50 rounded-lg p-4">
+                                    <p class="text-blue-800 text-sm"><i class="fas fa-info-circle mr-2"></i><strong>Función:</strong> Detectar cambios en el ambiente o sistema.</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-white border-2 border-green-200 rounded-xl p-6 hover:border-green-400 transition-colors">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-random text-green-600 text-xl"></i>
+                                    </div>
+                                    <h3 class="text-xl font-semibold text-gray-800">Transductor</h3>
+                                </div>
+                                <p class="text-gray-600 mb-4">Dispositivo que <strong>convierte</strong> una forma de energía en otra. Transforma la señal detectada en una señal eléctrica procesable.</p>
+                                <div class="bg-green-50 rounded-lg p-4">
+                                    <p class="text-green-800 text-sm"><i class="fas fa-info-circle mr-2"></i><strong>Función:</strong> Convertir energía de una forma a otra.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl p-6 mb-8">
+                            <h4 class="text-xl font-semibold mb-4"><i class="fas fa-project-diagram mr-2"></i>Relación Sensor-Transductor</h4>
+                            <div class="bg-white bg-opacity-20 rounded-lg p-4">
+                                <div class="flex flex-col md:flex-row items-center justify-center gap-4 text-center">
+                                    <div class="bg-white bg-opacity-30 rounded-lg p-3">
+                                        <i class="fas fa-heartbeat text-2xl mb-2"></i>
+                                        <p class="text-sm">Señal Física</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                    <div class="bg-blue-400 rounded-lg p-3">
+                                        <i class="fas fa-satellite-dish text-2xl mb-2"></i>
+                                        <p class="text-sm font-semibold">SENSOR</p>
+                                        <p class="text-xs">Detecta</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                    <div class="bg-green-400 rounded-lg p-3">
+                                        <i class="fas fa-random text-2xl mb-2"></i>
+                                        <p class="text-sm font-semibold">TRANSDUCTOR</p>
+                                        <p class="text-xs">Convierte</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                    <div class="bg-white bg-opacity-30 rounded-lg p-3">
+                                        <i class="fas fa-bolt text-2xl mb-2"></i>
+                                        <p class="text-sm">Señal Eléctrica</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-purple-100 text-sm mt-4 text-center"><i class="fas fa-info-circle mr-1"></i>En muchos casos, el sensor y transductor están integrados en un solo dispositivo.</p>
+                        </div>
+
+                        <div class="bg-gray-50 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-stethoscope mr-2 text-red-500"></i>Ejemplos en Biometría Médica</h4>
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <p class="font-semibold text-gray-700 mb-2"><i class="fas fa-thermometer-half mr-2 text-orange-500"></i>Termistor</p>
+                                    <p class="text-sm text-gray-600"><strong>Sensor:</strong> Material sensible a temperatura<br><strong>Transductor:</strong> Convierte cambio de resistencia en voltaje</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                    <p class="font-semibold text-gray-700 mb-2"><i class="fas fa-compress-arrows-alt mr-2 text-blue-500"></i>Strain Gauge</p>
+                                    <p class="text-sm text-gray-600"><strong>Sensor:</strong> Detecta deformación mecánica<br><strong>Transductor:</strong> Convierte presión en señal eléctrica</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- TAREA: Diferencias Sensor vs Transductor (10 minutos) -->
+                        <div id="task-section-step2-diferencias" class="mt-8 bg-gradient-to-br from-green-50 to-teal-50 rounded-xl p-6 border-2 border-green-200">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-xl font-semibold text-green-800">
+                                    <i class="fas fa-pencil-alt mr-2"></i>Tarea: Explica las Diferencias
+                                </h4>
+                                <div id="task-timer-step2-diferencias" class="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full shadow-sm border border-gray-300">
+                                    <i class="fas fa-clock text-gray-500"></i>
+                                    <span id="timer-minutes-step2-diferencias" class="font-mono font-bold text-gray-600">10</span>
+                                    <span class="text-gray-500">:</span>
+                                    <span id="timer-seconds-step2-diferencias" class="font-mono font-bold text-gray-600">00</span>
+                                </div>
+                            </div>
+
+                            <!-- Mensaje de espera antes de iniciar -->
+                            <div id="task-waiting-step2-diferencias" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                                    <div>
+                                        <p class="text-blue-800 font-medium">El cronometro iniciara cuando comiences a escribir</p>
+                                        <p class="text-blue-600 text-sm">Tienes 10 minutos para completar esta tarea. No podras avanzar al siguiente paso hasta que termine el tiempo.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-lg p-4 mb-4 border border-green-100">
+                                <p class="text-gray-700 mb-2"><strong>Instrucciones:</strong></p>
+                                <p class="text-gray-600 text-sm">Con base en lo que aprendiste, responde las siguientes preguntas:</p>
+                                <ul class="text-gray-600 text-sm mt-2 ml-4 list-disc">
+                                    <li>Explica con tus propias palabras la diferencia entre un sensor y un transductor</li>
+                                    <li>Da un ejemplo de un dispositivo biomedico que use ambos componentes</li>
+                                    <li>¿Por que es importante esta distincion en instrumentacion biomedica?</li>
+                                </ul>
+                            </div>
+
+                            <div id="task-input-container-step2-diferencias">
+                                <textarea
+                                    id="task-response-step2-diferencias"
+                                    class="w-full h-48 p-4 border-2 border-green-200 rounded-lg focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-colors resize-none"
+                                    placeholder="Comienza a escribir tu respuesta aqui... El cronometro de 10 minutos iniciara automaticamente."
+                                ></textarea>
+
+                                <div class="flex items-center justify-between mt-4">
+                                    <div id="task-error-step2-diferencias" class="hidden text-red-600 text-sm bg-red-50 px-4 py-2 rounded-lg">
+                                        <!-- Mensajes de error aqui -->
+                                    </div>
+                                    <span id="char-count-step2-diferencias" class="text-sm text-gray-500 ml-auto">0 caracteres</span>
+                                </div>
+                            </div>
+
+                            <!-- Estado de tarea completada -->
+                            <div id="task-completed-step2-diferencias" class="hidden">
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-check text-white text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold text-green-800">Tarea Completada</h5>
+                                            <p class="text-green-600 text-sm">Tu respuesta ha sido guardada exitosamente.</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 border border-green-100 max-h-40 overflow-y-auto">
+                                        <p class="text-xs text-gray-500 mb-1">Tu respuesta:</p>
+                                        <p id="saved-response-step2-diferencias" class="text-gray-700 text-sm whitespace-pre-wrap"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Estado de tiempo agotado -->
+                            <div id="task-timeout-step2-diferencias" class="hidden">
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-clock text-white text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold text-amber-800">Tiempo Completado</h5>
+                                            <p class="text-amber-600 text-sm">Los 10 minutos han terminado. Tu respuesta fue guardada automaticamente. Ahora puedes continuar al siguiente paso.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Características de Transductores -->
+                    <div class="step-content" data-step="3">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-sliders-h mr-3 text-green-600"></i>Características de los Transductores</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Para seleccionar el transductor adecuado, es necesario conocer sus características principales.</p>
+
+                        <div class="space-y-6 mb-8">
+                            <div class="scale-card border-blue-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-ruler text-blue-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Rango de Operación</h4>
+                                        <p class="text-gray-600 mb-3">Los valores <strong>mínimos y máximos</strong> de la magnitud física que el transductor puede medir correctamente.</p>
+                                        <div class="bg-blue-50 rounded-lg p-3">
+                                            <p class="text-blue-800 text-sm"><i class="fas fa-heartbeat mr-2"></i><strong>Ejemplo:</strong> Un transductor de presión con rango 0-300 mmHg para presión arterial.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-green-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-chart-line text-green-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Linealidad</h4>
+                                        <p class="text-gray-600 mb-3">Indica qué tan <strong>proporcional</strong> es la salida respecto a la entrada. Un transductor ideal tiene respuesta perfectamente lineal.</p>
+                                        <div class="bg-green-50 rounded-lg p-3">
+                                            <p class="text-green-800 text-sm"><i class="fas fa-percentage mr-2"></i>Se expresa como porcentaje de desviación de la línea recta ideal.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-purple-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-redo text-purple-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Histéresis</h4>
+                                        <p class="text-gray-600 mb-3">Diferencia en la salida cuando la entrada <strong>aumenta vs cuando disminuye</strong>. Un transductor ideal no tiene histéresis.</p>
+                                        <div class="bg-purple-50 rounded-lg p-3">
+                                            <p class="text-purple-800 text-sm"><i class="fas fa-info-circle mr-2"></i>Afecta la repetibilidad de las mediciones.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-orange-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-14 h-14 bg-orange-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-clock text-orange-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Tiempo de Respuesta</h4>
+                                        <p class="text-gray-600 mb-3">Tiempo necesario para que la salida alcance un porcentaje (típicamente 90%) del valor final ante un cambio en la entrada.</p>
+                                        <div class="bg-orange-50 rounded-lg p-3">
+                                            <p class="text-orange-800 text-sm"><i class="fas fa-bolt mr-2"></i>Crítico en señales que cambian rápidamente como ECG.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="scale-card border-red-500 bg-white rounded-r-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+                                <div class="flex items-start">
+                                    <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
+                                        <i class="fas fa-temperature-low text-red-600 text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xl font-semibold text-gray-800 mb-2">Deriva Térmica</h4>
+                                        <p class="text-gray-600 mb-3">Cambio en la salida debido a variaciones de <strong>temperatura ambiente</strong>, no de la magnitud medida.</p>
+                                        <div class="bg-red-50 rounded-lg p-3">
+                                            <p class="text-red-800 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Importante compensar en aplicaciones biomédicas.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-800 text-white rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold mb-4"><i class="fas fa-check-double mr-2 text-green-400"></i>Características Adicionales</h4>
+                            <div class="grid md:grid-cols-2 gap-4 text-sm">
+                                <ul class="space-y-2">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i><strong>Sensibilidad:</strong> Cambio de salida por unidad de entrada</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i><strong>Resolución:</strong> Mínimo cambio detectable</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i><strong>Exactitud:</strong> Cercanía al valor real</li>
+                                </ul>
+                                <ul class="space-y-2">
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i><strong>Repetibilidad:</strong> Consistencia entre mediciones</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i><strong>Estabilidad:</strong> Constancia a largo plazo</li>
+                                    <li><i class="fas fa-check text-green-400 mr-2"></i><strong>Biocompatibilidad:</strong> Seguridad para uso médico</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Video: Características de Transductores -->
+                        <div class="bg-gray-100 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fab fa-youtube mr-2 text-red-500"></i>Video: Características de los Transductores</h4>
+                            <div class="video-container rounded-lg overflow-hidden shadow-lg">
+                                <iframe src="https://www.youtube.com/embed/KNo3qfHZGMk" title="Características de Transductores" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>Profundiza en las características que definen el rendimiento de los transductores</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 4: Tipos de Transductores -->
+                    <div class="step-content" data-step="4">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-sitemap mr-3 text-green-600"></i>Tipos de Transductores</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Los transductores se clasifican según si requieren o no una fuente de energía externa para operar.</p>
+
+                        <div class="grid md:grid-cols-2 gap-8 mb-8">
+                            <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-sun text-white text-xl"></i>
+                                    </div>
+                                    <h4 class="text-xl font-semibold text-amber-800">Transductores Activos</h4>
+                                </div>
+                                <p class="text-gray-700 mb-4">Generan su propia señal eléctrica <strong>sin necesidad</strong> de fuente de alimentación externa. Convierten directamente la energía.</p>
+                                <div class="bg-white rounded-lg p-4 mb-4">
+                                    <p class="text-sm font-semibold text-amber-700 mb-2">Ejemplos:</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• <strong>Termopares:</strong> Temperatura → Voltaje</li>
+                                        <li>• <strong>Piezoeléctricos:</strong> Presión → Voltaje</li>
+                                        <li>• <strong>Fotovoltaicos:</strong> Luz → Corriente</li>
+                                        <li>• <strong>Electrodos EMG/ECG:</strong> Biopotencial → Voltaje</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-amber-200 rounded-lg p-3">
+                                    <p class="text-amber-800 text-sm"><i class="fas fa-bolt mr-2"></i><strong>Ventaja:</strong> No necesitan alimentación externa</p>
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200">
+                                <div class="flex items-center mb-4">
+                                    <div class="w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center mr-4">
+                                        <i class="fas fa-plug text-white text-xl"></i>
+                                    </div>
+                                    <h4 class="text-xl font-semibold text-blue-800">Transductores Pasivos</h4>
+                                </div>
+                                <p class="text-gray-700 mb-4"><strong>Requieren</strong> una fuente de energía externa. La magnitud física modifica alguna propiedad eléctrica del transductor.</p>
+                                <div class="bg-white rounded-lg p-4 mb-4">
+                                    <p class="text-sm font-semibold text-blue-700 mb-2">Ejemplos:</p>
+                                    <ul class="text-sm text-gray-600 space-y-1">
+                                        <li>• <strong>Termistores:</strong> Cambian resistencia con temperatura</li>
+                                        <li>• <strong>Strain Gauges:</strong> Cambian resistencia con deformación</li>
+                                        <li>• <strong>Fotorresistores:</strong> Cambian resistencia con luz</li>
+                                        <li>• <strong>LVDT:</strong> Cambian inductancia con posición</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-blue-200 rounded-lg p-3">
+                                    <p class="text-blue-800 text-sm"><i class="fas fa-cog mr-2"></i><strong>Ventaja:</strong> Mayor sensibilidad y control</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-100 rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-table mr-2 text-green-600"></i>Comparación de Tipos</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="bg-green-600 text-white">
+                                            <th class="p-3 text-left rounded-tl-lg">Característica</th>
+                                            <th class="p-3 text-center">Activos</th>
+                                            <th class="p-3 text-center rounded-tr-lg">Pasivos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="bg-white border-b"><td class="p-3 font-medium">Alimentación externa</td><td class="p-3 text-center"><i class="fas fa-times text-red-500"></i> No requiere</td><td class="p-3 text-center"><i class="fas fa-check text-green-500"></i> Requiere</td></tr>
+                                        <tr class="bg-gray-50 border-b"><td class="p-3 font-medium">Señal de salida</td><td class="p-3 text-center">Genera voltaje/corriente</td><td class="p-3 text-center">Modifica R, L, o C</td></tr>
+                                        <tr class="bg-white border-b"><td class="p-3 font-medium">Sensibilidad</td><td class="p-3 text-center">Generalmente menor</td><td class="p-3 text-center">Puede ser muy alta</td></tr>
+                                        <tr class="bg-gray-50"><td class="p-3 font-medium">Complejidad del circuito</td><td class="p-3 text-center">Más simple</td><td class="p-3 text-center">Requiere acondicionamiento</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-8">
+                            <p class="text-yellow-800"><i class="fas fa-lightbulb mr-2"></i><strong>Nota importante:</strong> En biometría médica, la elección entre transductor activo o pasivo depende de la aplicación específica, considerando factores como sensibilidad requerida, rango de frecuencia y condiciones de uso.</p>
+                        </div>
+
+                        <!-- Imagen: Rutas de transmisión de señales -->
+                        <div class="bg-white rounded-xl p-6 border border-green-200 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4 text-center"><i class="fas fa-project-diagram mr-2 text-green-600"></i>Rutas de Transmisión de Señales Fisiológicas</h4>
+                            <div class="flex justify-center">
+                                <img src="images/rutas_transmision.png" alt="Rutas de Transmisión" class="max-w-full h-auto rounded-lg shadow-md" style="max-height: 350px;">
+                            </div>
+                            <p class="text-xs text-gray-500 text-center mt-3"><i class="fas fa-book mr-1"></i>Fuente: Material del curso TEBI 2035</p>
+                        </div>
+
+                        <!-- Video: Tipos de Transductores -->
+                        <div class="bg-gray-100 rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fab fa-youtube mr-2 text-red-500"></i>Video: Tipos de Transductores (Activos y Pasivos)</h4>
+                            <div class="video-container rounded-lg overflow-hidden shadow-lg">
+                                <iframe src="https://www.youtube.com/embed/MBFqGnr5DrI" title="Tipos de Transductores" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>Explicación detallada de transductores activos y pasivos con ejemplos</p>
+                        </div>
+
+                        <!-- TAREA: Clasificación de Transductores (10 minutos) -->
+                        <div id="task-section-step4-clasificacion" class="mt-8 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-6 border-2 border-amber-200">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-xl font-semibold text-amber-800">
+                                    <i class="fas fa-pencil-alt mr-2"></i>Tarea: Clasifica los Transductores
+                                </h4>
+                                <div id="task-timer-step4-clasificacion" class="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full shadow-sm border border-gray-300">
+                                    <i class="fas fa-clock text-gray-500"></i>
+                                    <span id="timer-minutes-step4-clasificacion" class="font-mono font-bold text-gray-600">10</span>
+                                    <span class="text-gray-500">:</span>
+                                    <span id="timer-seconds-step4-clasificacion" class="font-mono font-bold text-gray-600">00</span>
+                                </div>
+                            </div>
+
+                            <!-- Mensaje de espera antes de iniciar -->
+                            <div id="task-waiting-step4-clasificacion" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                                    <div>
+                                        <p class="text-blue-800 font-medium">El cronometro iniciara cuando comiences a escribir</p>
+                                        <p class="text-blue-600 text-sm">Tienes 10 minutos para completar esta tarea. No podras avanzar al siguiente paso hasta que termine el tiempo.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-lg p-4 mb-4 border border-amber-100">
+                                <p class="text-gray-700 mb-2"><strong>Instrucciones:</strong></p>
+                                <p class="text-gray-600 text-sm">Clasifica los siguientes transductores como ACTIVOS o PASIVOS y explica brevemente por que:</p>
+                                <ul class="text-gray-600 text-sm mt-2 ml-4 list-disc">
+                                    <li><strong>Termopar</strong> - ¿Activo o Pasivo? ¿Por que?</li>
+                                    <li><strong>Termistor</strong> - ¿Activo o Pasivo? ¿Por que?</li>
+                                    <li><strong>Electrodo de ECG</strong> - ¿Activo o Pasivo? ¿Por que?</li>
+                                    <li><strong>Strain Gauge</strong> - ¿Activo o Pasivo? ¿Por que?</li>
+                                </ul>
+                            </div>
+
+                            <div id="task-input-container-step4-clasificacion">
+                                <textarea
+                                    id="task-response-step4-clasificacion"
+                                    class="w-full h-48 p-4 border-2 border-amber-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 transition-colors resize-none"
+                                    placeholder="Comienza a escribir tu clasificacion aqui... El cronometro de 10 minutos iniciara automaticamente."
+                                ></textarea>
+
+                                <div class="flex items-center justify-between mt-4">
+                                    <div id="task-error-step4-clasificacion" class="hidden text-red-600 text-sm bg-red-50 px-4 py-2 rounded-lg">
+                                        <!-- Mensajes de error aqui -->
+                                    </div>
+                                    <span id="char-count-step4-clasificacion" class="text-sm text-gray-500 ml-auto">0 caracteres</span>
+                                </div>
+                            </div>
+
+                            <!-- Estado de tarea completada -->
+                            <div id="task-completed-step4-clasificacion" class="hidden">
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-check text-white text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold text-green-800">Tarea Completada</h5>
+                                            <p class="text-green-600 text-sm">Tu respuesta ha sido guardada exitosamente.</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 border border-green-100 max-h-40 overflow-y-auto">
+                                        <p class="text-xs text-gray-500 mb-1">Tu respuesta:</p>
+                                        <p id="saved-response-step4-clasificacion" class="text-gray-700 text-sm whitespace-pre-wrap"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Estado de tiempo agotado -->
+                            <div id="task-timeout-step4-clasificacion" class="hidden">
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-clock text-white text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold text-amber-800">Tiempo Completado</h5>
+                                            <p class="text-amber-600 text-sm">Los 10 minutos han terminado. Tu respuesta fue guardada automaticamente. Ahora puedes continuar al siguiente paso.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 5: Transductores Biomédicos Comunes -->
+                    <div class="step-content" data-step="5">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-heartbeat mr-3 text-green-600"></i>Transductores Biomédicos Comunes</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Estos son los transductores más utilizados en instrumentación biomédica.</p>
+
+                        <div class="space-y-6 mb-8">
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-red-500 to-red-600 text-white p-4">
+                                    <h4 class="text-xl font-semibold"><i class="fas fa-compress-arrows-alt mr-2"></i>Transductores de Presión</h4>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-gray-700 mb-4">Utilizados para medir presión arterial, presión intracraneal, presión intraocular, entre otras.</p>
+                                    <div class="grid md:grid-cols-2 gap-4">
+                                        <div class="bg-red-50 rounded-lg p-4">
+                                            <p class="font-semibold text-red-700 mb-2">Strain Gauge</p>
+                                            <p class="text-sm text-gray-600">Mide deformación de un diafragma. La presión deforma el elemento sensible, cambiando su resistencia.</p>
+                                        </div>
+                                        <div class="bg-red-50 rounded-lg p-4">
+                                            <p class="font-semibold text-red-700 mb-2">Piezoeléctrico</p>
+                                            <p class="text-sm text-gray-600">Genera voltaje cuando se aplica presión. Ideal para mediciones dinámicas.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-4">
+                                    <h4 class="text-xl font-semibold"><i class="fas fa-thermometer-half mr-2"></i>Transductores de Temperatura</h4>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-gray-700 mb-4">Esenciales para monitoreo de temperatura corporal, incubadoras y equipos de esterilización.</p>
+                                    <div class="grid md:grid-cols-3 gap-4">
+                                        <div class="bg-orange-50 rounded-lg p-4">
+                                            <p class="font-semibold text-orange-700 mb-2">Termistor</p>
+                                            <p class="text-sm text-gray-600">Resistencia que varía con temperatura. Alta sensibilidad, bajo costo.</p>
+                                        </div>
+                                        <div class="bg-orange-50 rounded-lg p-4">
+                                            <p class="font-semibold text-orange-700 mb-2">Termopar</p>
+                                            <p class="text-sm text-gray-600">Genera voltaje por efecto Seebeck. Amplio rango de temperatura.</p>
+                                        </div>
+                                        <div class="bg-orange-50 rounded-lg p-4">
+                                            <p class="font-semibold text-orange-700 mb-2">RTD</p>
+                                            <p class="text-sm text-gray-600">Detector de temperatura resistivo. Alta precisión y estabilidad.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-4">
+                                    <h4 class="text-xl font-semibold"><i class="fas fa-wave-square mr-2"></i>Electrodos para Biopotenciales</h4>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-gray-700 mb-4">Capturan señales eléctricas generadas por el cuerpo (ECG, EEG, EMG).</p>
+                                    <div class="grid md:grid-cols-2 gap-4">
+                                        <div class="bg-blue-50 rounded-lg p-4">
+                                            <p class="font-semibold text-blue-700 mb-2">Electrodos de Superficie</p>
+                                            <p class="text-sm text-gray-600">Ag/AgCl, desechables o reutilizables. Para ECG, EEG de rutina.</p>
+                                        </div>
+                                        <div class="bg-blue-50 rounded-lg p-4">
+                                            <p class="font-semibold text-blue-700 mb-2">Electrodos de Aguja</p>
+                                            <p class="text-sm text-gray-600">Invasivos, para EMG intramuscular y estudios de conducción nerviosa.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                                <div class="bg-gradient-to-r from-green-500 to-green-600 text-white p-4">
+                                    <h4 class="text-xl font-semibold"><i class="fas fa-lungs mr-2"></i>Transductores de Flujo</h4>
+                                </div>
+                                <div class="p-6">
+                                    <p class="text-gray-700 mb-4">Miden flujo de aire (espirometría) o flujo sanguíneo (Doppler).</p>
+                                    <div class="grid md:grid-cols-2 gap-4">
+                                        <div class="bg-green-50 rounded-lg p-4">
+                                            <p class="font-semibold text-green-700 mb-2">Neumotacógrafo</p>
+                                            <p class="text-sm text-gray-600">Mide diferencia de presión a través de una resistencia conocida para calcular flujo de aire.</p>
+                                        </div>
+                                        <div class="bg-green-50 rounded-lg p-4">
+                                            <p class="font-semibold text-green-700 mb-2">Doppler Ultrasónico</p>
+                                            <p class="text-sm text-gray-600">Detecta cambio de frecuencia del ultrasonido reflejado por células sanguíneas en movimiento.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Imágenes: Sistema Biomédico y Señales Fisiológicas -->
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-white rounded-xl p-4 border border-red-200">
+                                <h5 class="font-semibold text-gray-800 mb-3 text-center"><i class="fas fa-heartbeat mr-2 text-red-600"></i>Sistema de Medición Biomédico</h5>
+                                <div class="flex justify-center">
+                                    <img src="images/sistema_biomedico.png" alt="Sistema Biomédico" class="max-w-full h-auto rounded-lg shadow-sm" style="max-height: 250px;">
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl p-4 border border-blue-200">
+                                <h5 class="font-semibold text-gray-800 mb-3 text-center"><i class="fas fa-table mr-2 text-blue-600"></i>Señales Fisiológicas</h5>
+                                <div class="flex justify-center">
+                                    <img src="images/tabla_senales_fisiologicas.png" alt="Tabla de Señales Fisiológicas" class="max-w-full h-auto rounded-lg shadow-sm" style="max-height: 250px;">
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 text-center mb-8"><i class="fas fa-book mr-1"></i>Fuente: Material del curso TEBI 2035</p>
+
+                        <!-- Video: Transductores Biomédicos -->
+                        <div class="bg-gray-100 rounded-xl p-6">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fab fa-youtube mr-2 text-red-500"></i>Video: Transductores en Instrumentación Biomédica</h4>
+                            <div class="video-container rounded-lg overflow-hidden shadow-lg">
+                                <iframe src="https://www.youtube.com/embed/B1J6Ou4q8vE" title="Transductores Biomédicos" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>Aplicaciones de transductores en el campo de la ingeniería biomédica</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 6: Biosensores -->
+                    <div class="step-content" data-step="6">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-dna mr-3 text-green-600"></i>Biosensores</h2>
+                        <p class="text-gray-700 mb-6 text-lg">Los biosensores combinan un componente biológico con un transductor para detectar sustancias específicas.</p>
+
+                        <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl p-6 mb-8">
+                            <h4 class="text-xl font-semibold mb-3"><i class="fas fa-flask mr-2"></i>¿Qué es un Biosensor?</h4>
+                            <p class="mb-4">Un biosensor es un dispositivo analítico que combina un <strong>elemento de reconocimiento biológico</strong> (enzima, anticuerpo, ADN) con un <strong>transductor físico-químico</strong> para detectar y cuantificar analitos específicos.</p>
+                            <div class="bg-white bg-opacity-20 rounded-lg p-4">
+                                <div class="flex flex-col md:flex-row items-center justify-center gap-4 text-center">
+                                    <div class="bg-white bg-opacity-30 rounded-lg p-3">
+                                        <i class="fas fa-tint text-2xl mb-2"></i>
+                                        <p class="text-sm">Analito</p>
+                                        <p class="text-xs">(ej: glucosa)</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                    <div class="bg-pink-400 rounded-lg p-3">
+                                        <i class="fas fa-dna text-2xl mb-2"></i>
+                                        <p class="text-sm font-semibold">Bioreceptor</p>
+                                        <p class="text-xs">(enzima, anticuerpo)</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                    <div class="bg-purple-400 rounded-lg p-3">
+                                        <i class="fas fa-microchip text-2xl mb-2"></i>
+                                        <p class="text-sm font-semibold">Transductor</p>
+                                        <p class="text-xs">(electroquímico)</p>
+                                    </div>
+                                    <i class="fas fa-arrow-right text-xl"></i>
+                                    <div class="bg-white bg-opacity-30 rounded-lg p-3">
+                                        <i class="fas fa-chart-line text-2xl mb-2"></i>
+                                        <p class="text-sm">Señal</p>
+                                        <p class="text-xs">(medible)</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="bg-white rounded-xl p-6 shadow-md border-l-4 border-blue-500">
+                                <h4 class="font-semibold text-gray-800 mb-3"><i class="fas fa-vial mr-2 text-blue-500"></i>Tipos de Bioreceptores</h4>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i><strong>Enzimas:</strong> Catalizan reacciones específicas</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i><strong>Anticuerpos:</strong> Reconocen antígenos específicos</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i><strong>Ácidos nucleicos:</strong> Detectan secuencias de ADN/ARN</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i><strong>Células:</strong> Responden a estímulos biológicos</li>
+                                    <li><i class="fas fa-check text-blue-500 mr-2"></i><strong>Aptámeros:</strong> Moléculas sintéticas de reconocimiento</li>
+                                </ul>
+                            </div>
+
+                            <div class="bg-white rounded-xl p-6 shadow-md border-l-4 border-green-500">
+                                <h4 class="font-semibold text-gray-800 mb-3"><i class="fas fa-exchange-alt mr-2 text-green-500"></i>Tipos de Transductores</h4>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i><strong>Electroquímicos:</strong> Miden corriente o potencial</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i><strong>Ópticos:</strong> Detectan cambios de luz/fluorescencia</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i><strong>Piezoeléctricos:</strong> Detectan cambios de masa</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i><strong>Térmicos:</strong> Miden calor de reacción</li>
+                                    <li><i class="fas fa-check text-green-500 mr-2"></i><strong>Magnéticos:</strong> Detectan partículas magnéticas</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Diagrama SVG: Estructura Detallada de Biosensor -->
+                        <div class="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 mb-8 border border-purple-200">
+                            <h4 class="font-semibold text-gray-800 mb-4 text-center"><i class="fas fa-dna mr-2 text-purple-600"></i>Estructura y Funcionamiento de un Biosensor</h4>
+                            <div class="overflow-x-auto">
+                                <svg viewBox="0 0 800 350" class="w-full max-w-4xl mx-auto" style="min-width: 600px;">
+                                    <defs>
+                                        <linearGradient id="gradMuestra" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#dbeafe"/>
+                                            <stop offset="100%" style="stop-color:#93c5fd"/>
+                                        </linearGradient>
+                                        <linearGradient id="gradBioreceptor" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#f3e8ff"/>
+                                            <stop offset="100%" style="stop-color:#d8b4fe"/>
+                                        </linearGradient>
+                                        <linearGradient id="gradTransductor" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#fef3c7"/>
+                                            <stop offset="100%" style="stop-color:#fde68a"/>
+                                        </linearGradient>
+                                        <linearGradient id="gradProcesador" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" style="stop-color:#d1fae5"/>
+                                            <stop offset="100%" style="stop-color:#6ee7b7"/>
+                                        </linearGradient>
+                                        <marker id="arrowBio" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                            <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+                                        </marker>
+                                    </defs>
+
+                                    <!-- Titulo -->
+                                    <text x="400" y="25" text-anchor="middle" font-size="14" font-weight="bold" fill="#374151">Diagrama de Bloques de un Biosensor</text>
+
+                                    <!-- MUESTRA / ANALITO -->
+                                    <g transform="translate(20, 60)">
+                                        <rect x="0" y="0" width="140" height="120" rx="10" fill="url(#gradMuestra)" stroke="#3b82f6" stroke-width="2"/>
+                                        <text x="70" y="25" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e40af">MUESTRA</text>
+                                        <circle cx="70" cy="70" r="25" fill="#60a5fa" opacity="0.5"/>
+                                        <circle cx="55" cy="65" r="6" fill="#2563eb"/>
+                                        <circle cx="70" cy="55" r="5" fill="#2563eb"/>
+                                        <circle cx="85" cy="70" r="7" fill="#2563eb"/>
+                                        <circle cx="65" cy="80" r="5" fill="#2563eb"/>
+                                        <circle cx="78" cy="85" r="6" fill="#2563eb"/>
+                                        <text x="70" y="110" text-anchor="middle" font-size="9" fill="#1e40af">Analitos</text>
+                                        <text x="70" y="118" text-anchor="middle" font-size="8" fill="#6b7280">(glucosa, lactato...)</text>
+                                    </g>
+
+                                    <!-- Flecha 1 -->
+                                    <line x1="160" y1="120" x2="195" y2="120" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowBio)"/>
+
+                                    <!-- BIORECEPTOR -->
+                                    <g transform="translate(200, 50)">
+                                        <rect x="0" y="0" width="180" height="140" rx="10" fill="url(#gradBioreceptor)" stroke="#9333ea" stroke-width="2"/>
+                                        <text x="90" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#7c3aed">BIORECEPTOR</text>
+                                        <text x="90" y="36" text-anchor="middle" font-size="9" fill="#6b7280">(Elemento de Reconocimiento)</text>
+
+                                        <!-- Enzima icono -->
+                                        <rect x="15" y="50" width="70" height="40" rx="5" fill="#a855f7" opacity="0.3"/>
+                                        <text x="50" y="68" text-anchor="middle" font-size="8" fill="#7c3aed">Enzima</text>
+                                        <text x="50" y="80" text-anchor="middle" font-size="7" fill="#6b7280">GOx, LOx</text>
+
+                                        <!-- Anticuerpo icono -->
+                                        <rect x="95" y="50" width="70" height="40" rx="5" fill="#a855f7" opacity="0.3"/>
+                                        <text x="130" y="68" text-anchor="middle" font-size="8" fill="#7c3aed">Anticuerpo</text>
+                                        <text x="130" y="80" text-anchor="middle" font-size="7" fill="#6b7280">IgG, IgM</text>
+
+                                        <!-- ADN icono -->
+                                        <rect x="55" y="95" width="70" height="35" rx="5" fill="#a855f7" opacity="0.3"/>
+                                        <text x="90" y="110" text-anchor="middle" font-size="8" fill="#7c3aed">ADN/ARN</text>
+                                        <text x="90" y="122" text-anchor="middle" font-size="7" fill="#6b7280">Sondas</text>
+                                    </g>
+
+                                    <!-- Flecha 2 -->
+                                    <line x1="380" y1="120" x2="415" y2="120" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowBio)"/>
+
+                                    <!-- TRANSDUCTOR -->
+                                    <g transform="translate(420, 50)">
+                                        <rect x="0" y="0" width="160" height="140" rx="10" fill="url(#gradTransductor)" stroke="#f59e0b" stroke-width="2"/>
+                                        <text x="80" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#b45309">TRANSDUCTOR</text>
+                                        <text x="80" y="36" text-anchor="middle" font-size="9" fill="#6b7280">(Convierte senal)</text>
+
+                                        <!-- Electroquimico -->
+                                        <rect x="10" y="50" width="65" height="35" rx="4" fill="#fbbf24" opacity="0.4"/>
+                                        <text x="42" y="65" text-anchor="middle" font-size="7" fill="#92400e">Electro-</text>
+                                        <text x="42" y="75" text-anchor="middle" font-size="7" fill="#92400e">quimico</text>
+
+                                        <!-- Optico -->
+                                        <rect x="85" y="50" width="65" height="35" rx="4" fill="#fbbf24" opacity="0.4"/>
+                                        <text x="117" y="68" text-anchor="middle" font-size="7" fill="#92400e">Optico</text>
+
+                                        <!-- Piezoelectrico -->
+                                        <rect x="10" y="95" width="65" height="35" rx="4" fill="#fbbf24" opacity="0.4"/>
+                                        <text x="42" y="108" text-anchor="middle" font-size="7" fill="#92400e">Piezo-</text>
+                                        <text x="42" y="118" text-anchor="middle" font-size="7" fill="#92400e">electrico</text>
+
+                                        <!-- Termico -->
+                                        <rect x="85" y="95" width="65" height="35" rx="4" fill="#fbbf24" opacity="0.4"/>
+                                        <text x="117" y="113" text-anchor="middle" font-size="7" fill="#92400e">Termico</text>
+                                    </g>
+
+                                    <!-- Flecha 3 -->
+                                    <line x1="580" y1="120" x2="615" y2="120" stroke="#7c3aed" stroke-width="3" marker-end="url(#arrowBio)"/>
+
+                                    <!-- PROCESADOR / SALIDA -->
+                                    <g transform="translate(620, 50)">
+                                        <rect x="0" y="0" width="160" height="140" rx="10" fill="url(#gradProcesador)" stroke="#10b981" stroke-width="2"/>
+                                        <text x="80" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#047857">PROCESADOR</text>
+                                        <text x="80" y="36" text-anchor="middle" font-size="9" fill="#6b7280">(Senal electrica)</text>
+
+                                        <!-- Amplificador -->
+                                        <rect x="20" y="50" width="120" height="25" rx="4" fill="#34d399" opacity="0.4"/>
+                                        <text x="80" y="67" text-anchor="middle" font-size="8" fill="#047857">Amplificador + Filtro</text>
+
+                                        <!-- ADC -->
+                                        <rect x="20" y="80" width="120" height="25" rx="4" fill="#34d399" opacity="0.4"/>
+                                        <text x="80" y="97" text-anchor="middle" font-size="8" fill="#047857">Conversion A/D</text>
+
+                                        <!-- Display -->
+                                        <rect x="35" y="110" width="90" height="25" rx="4" fill="#10b981"/>
+                                        <text x="80" y="127" text-anchor="middle" font-size="9" font-weight="bold" fill="white">DISPLAY</text>
+                                    </g>
+
+                                    <!-- Linea inferior con detalles -->
+                                    <rect x="50" y="220" width="700" height="110" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+                                    <text x="400" y="245" text-anchor="middle" font-size="11" font-weight="bold" fill="#374151">Flujo de Senal en el Biosensor</text>
+
+                                    <!-- Flujo detallado -->
+                                    <g transform="translate(70, 260)">
+                                        <rect x="0" y="0" width="100" height="50" rx="5" fill="#dbeafe"/>
+                                        <text x="50" y="20" text-anchor="middle" font-size="9" font-weight="bold" fill="#1e40af">Interaccion</text>
+                                        <text x="50" y="33" text-anchor="middle" font-size="8" fill="#3b82f6">Analito-Receptor</text>
+                                        <text x="50" y="45" text-anchor="middle" font-size="7" fill="#6b7280">(especifica)</text>
+                                    </g>
+                                    <text x="185" y="290" font-size="16" fill="#7c3aed">→</text>
+                                    <g transform="translate(200, 260)">
+                                        <rect x="0" y="0" width="100" height="50" rx="5" fill="#f3e8ff"/>
+                                        <text x="50" y="20" text-anchor="middle" font-size="9" font-weight="bold" fill="#7c3aed">Cambio Fisico/</text>
+                                        <text x="50" y="33" text-anchor="middle" font-size="8" fill="#9333ea">Quimico</text>
+                                        <text x="50" y="45" text-anchor="middle" font-size="7" fill="#6b7280">(pH, e-, luz)</text>
+                                    </g>
+                                    <text x="315" y="290" font-size="16" fill="#7c3aed">→</text>
+                                    <g transform="translate(330, 260)">
+                                        <rect x="0" y="0" width="100" height="50" rx="5" fill="#fef3c7"/>
+                                        <text x="50" y="20" text-anchor="middle" font-size="9" font-weight="bold" fill="#b45309">Senal</text>
+                                        <text x="50" y="33" text-anchor="middle" font-size="8" fill="#d97706">Electrica</text>
+                                        <text x="50" y="45" text-anchor="middle" font-size="7" fill="#6b7280">(mV, µA)</text>
+                                    </g>
+                                    <text x="445" y="290" font-size="16" fill="#7c3aed">→</text>
+                                    <g transform="translate(460, 260)">
+                                        <rect x="0" y="0" width="100" height="50" rx="5" fill="#d1fae5"/>
+                                        <text x="50" y="20" text-anchor="middle" font-size="9" font-weight="bold" fill="#047857">Procesamiento</text>
+                                        <text x="50" y="33" text-anchor="middle" font-size="8" fill="#10b981">Digital</text>
+                                        <text x="50" y="45" text-anchor="middle" font-size="7" fill="#6b7280">(amplificar, filtrar)</text>
+                                    </g>
+                                    <text x="575" y="290" font-size="16" fill="#7c3aed">→</text>
+                                    <g transform="translate(590, 260)">
+                                        <rect x="0" y="0" width="140" height="50" rx="5" fill="#10b981"/>
+                                        <text x="70" y="22" text-anchor="middle" font-size="10" font-weight="bold" fill="white">RESULTADO</text>
+                                        <text x="70" y="38" text-anchor="middle" font-size="9" fill="white">Concentracion</text>
+                                        <text x="70" y="48" text-anchor="middle" font-size="8" fill="#d1fae5">(mg/dL, mmol/L)</text>
+                                    </g>
+                                </svg>
+                            </div>
+                            <p class="text-xs text-gray-500 text-center mt-4"><i class="fas fa-info-circle mr-1"></i>El elemento clave es la especificidad del bioreceptor que permite detectar solo el analito de interes</p>
+                        </div>
+
+                        <div class="bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fas fa-star mr-2 text-teal-500"></i>Ejemplo: Glucómetro</h4>
+                            <p class="text-gray-700 mb-4">El medidor de glucosa es el biosensor más común y utilizado por millones de diabéticos diariamente.</p>
+                            <div class="bg-white rounded-lg p-4">
+                                <div class="grid md:grid-cols-3 gap-4 text-center">
+                                    <div class="p-3">
+                                        <div class="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-tint text-teal-600"></i>
+                                        </div>
+                                        <p class="font-semibold text-gray-700">1. Muestra</p>
+                                        <p class="text-sm text-gray-500">Gota de sangre</p>
+                                    </div>
+                                    <div class="p-3">
+                                        <div class="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-flask text-teal-600"></i>
+                                        </div>
+                                        <p class="font-semibold text-gray-700">2. Reacción</p>
+                                        <p class="text-sm text-gray-500">Glucosa oxidasa + glucosa</p>
+                                    </div>
+                                    <div class="p-3">
+                                        <div class="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <i class="fas fa-bolt text-teal-600"></i>
+                                        </div>
+                                        <p class="font-semibold text-gray-700">3. Medición</p>
+                                        <p class="text-sm text-gray-500">Corriente proporcional a glucosa</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-8">
+                            <p class="text-yellow-800"><i class="fas fa-rocket mr-2"></i><strong>Futuro de los biosensores:</strong> Sensores continuos de glucosa (CGM), biosensores implantables, diagnóstico point-of-care, y detección temprana de enfermedades son áreas de rápido desarrollo.</p>
+                        </div>
+
+                        <!-- Video: Biosensores -->
+                        <div class="bg-gray-100 rounded-xl p-6 mb-8">
+                            <h4 class="font-semibold text-gray-800 mb-4"><i class="fab fa-youtube mr-2 text-red-500"></i>Video: Biosensores - Principios y Aplicaciones</h4>
+                            <div class="video-container rounded-lg overflow-hidden shadow-lg">
+                                <iframe src="https://www.youtube.com/embed/7F9RV_RMEfE" title="Biosensores" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-3 text-center"><i class="fas fa-info-circle mr-1"></i>Aprende cómo funcionan los biosensores y sus aplicaciones en medicina</p>
+                        </div>
+
+                        <!-- Imágenes del PDF: Biosensores -->
+                        <div class="grid md:grid-cols-3 gap-6 mb-8">
+                            <div class="bg-white rounded-xl p-4 border border-purple-200">
+                                <h5 class="font-semibold text-gray-800 mb-3 text-center"><i class="fas fa-dna mr-2 text-purple-600"></i>Estructura del Biosensor</h5>
+                                <div class="flex justify-center">
+                                    <img src="images/biosensor_diagrama.png" alt="Diagrama de Biosensor" class="max-w-full h-auto rounded-lg shadow-sm" style="max-height: 220px;">
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl p-4 border border-pink-200">
+                                <h5 class="font-semibold text-gray-800 mb-3 text-center"><i class="fas fa-cubes mr-2 text-pink-600"></i>Componentes del Biosensor</h5>
+                                <div class="flex justify-center">
+                                    <img src="images/biosensor_componentes.png" alt="Componentes del Biosensor" class="max-w-full h-auto rounded-lg shadow-sm" style="max-height: 220px;">
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl p-4 border border-teal-200">
+                                <h5 class="font-semibold text-gray-800 mb-3 text-center"><i class="fas fa-tint mr-2 text-teal-600"></i>Glucometro - Biosensor</h5>
+                                <div class="flex justify-center">
+                                    <img src="images/biosensor_glucosa.png" alt="Biosensor de Glucosa" class="max-w-full h-auto rounded-lg shadow-sm" style="max-height: 220px;">
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 text-center mb-8"><i class="fas fa-book mr-1"></i>Fuente: Material del curso TEBI 2035</p>
+
+                        <!-- TAREA: Análisis de Biosensor (10 minutos) -->
+                        <div id="task-section-step6-biosensor" class="mt-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
+                            <div class="flex items-center justify-between mb-4">
+                                <h4 class="text-xl font-semibold text-purple-800">
+                                    <i class="fas fa-pencil-alt mr-2"></i>Tarea: Analiza el Glucometro
+                                </h4>
+                                <div id="task-timer-step6-biosensor" class="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-full shadow-sm border border-gray-300">
+                                    <i class="fas fa-clock text-gray-500"></i>
+                                    <span id="timer-minutes-step6-biosensor" class="font-mono font-bold text-gray-600">10</span>
+                                    <span class="text-gray-500">:</span>
+                                    <span id="timer-seconds-step6-biosensor" class="font-mono font-bold text-gray-600">00</span>
+                                </div>
+                            </div>
+
+                            <!-- Mensaje de espera antes de iniciar -->
+                            <div id="task-waiting-step6-biosensor" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-info-circle text-blue-500 text-xl"></i>
+                                    <div>
+                                        <p class="text-blue-800 font-medium">El cronometro iniciara cuando comiences a escribir</p>
+                                        <p class="text-blue-600 text-sm">Tienes 10 minutos para completar esta tarea. No podras avanzar al siguiente paso hasta que termine el tiempo.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-lg p-4 mb-4 border border-purple-100">
+                                <p class="text-gray-700 mb-2"><strong>Instrucciones:</strong></p>
+                                <p class="text-gray-600 text-sm">Analiza el glucometro como ejemplo de biosensor y responde:</p>
+                                <ul class="text-gray-600 text-sm mt-2 ml-4 list-disc">
+                                    <li>¿Cual es el <strong>bioreceptor</strong> utilizado en un glucometro? (enzima especifica)</li>
+                                    <li>¿Que tipo de <strong>transductor</strong> convierte la senal quimica en electrica?</li>
+                                    <li>¿Por que es importante la <strong>especificidad</strong> del bioreceptor?</li>
+                                    <li>Menciona una ventaja y una limitacion de los glucometros actuales</li>
+                                </ul>
+                            </div>
+
+                            <div id="task-input-container-step6-biosensor">
+                                <textarea
+                                    id="task-response-step6-biosensor"
+                                    class="w-full h-48 p-4 border-2 border-purple-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-colors resize-none"
+                                    placeholder="Comienza a escribir tu analisis aqui... El cronometro de 10 minutos iniciara automaticamente."
+                                ></textarea>
+
+                                <div class="flex items-center justify-between mt-4">
+                                    <div id="task-error-step6-biosensor" class="hidden text-red-600 text-sm bg-red-50 px-4 py-2 rounded-lg">
+                                        <!-- Mensajes de error aqui -->
+                                    </div>
+                                    <span id="char-count-step6-biosensor" class="text-sm text-gray-500 ml-auto">0 caracteres</span>
+                                </div>
+                            </div>
+
+                            <!-- Estado de tarea completada -->
+                            <div id="task-completed-step6-biosensor" class="hidden">
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-check text-white text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold text-green-800">Tarea Completada</h5>
+                                            <p class="text-green-600 text-sm">Tu respuesta ha sido guardada exitosamente.</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-white rounded-lg p-3 border border-green-100 max-h-40 overflow-y-auto">
+                                        <p class="text-xs text-gray-500 mb-1">Tu respuesta:</p>
+                                        <p id="saved-response-step6-biosensor" class="text-gray-700 text-sm whitespace-pre-wrap"></p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Estado de tiempo agotado -->
+                            <div id="task-timeout-step6-biosensor" class="hidden">
+                                <div class="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 bg-amber-500 rounded-full flex items-center justify-center">
+                                            <i class="fas fa-clock text-white text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="font-semibold text-amber-800">Tiempo Completado</h5>
+                                            <p class="text-amber-600 text-sm">Los 10 minutos han terminado. Tu respuesta fue guardada automaticamente. Ahora puedes continuar al siguiente paso.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 7: Resumen -->
+                    <div class="step-content" data-step="7">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-clipboard-list mr-3 text-green-600"></i>Resumen y Puntos Clave</h2>
+
+                        <div class="bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl p-6 mb-8">
+                            <h3 class="text-xl font-semibold mb-4"><i class="fas fa-star mr-2"></i>Lo que aprendiste en este módulo</h3>
+                            <p class="text-green-100">Has completado el Módulo 1B. Aquí están los puntos más importantes.</p>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6 mb-8">
+                            <div class="space-y-4">
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-blue-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-exchange-alt mr-2 text-blue-500"></i>Sensor vs Transductor</h5>
+                                    <p class="text-sm text-gray-600"><strong>Sensor:</strong> Detecta la señal física<br><strong>Transductor:</strong> Convierte energía de una forma a otra</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-green-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-sliders-h mr-2 text-green-500"></i>Características Clave</h5>
+                                    <p class="text-sm text-gray-600">Rango, linealidad, histéresis, tiempo de respuesta, deriva térmica, sensibilidad, resolución</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-purple-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-sitemap mr-2 text-purple-500"></i>Tipos de Transductores</h5>
+                                    <p class="text-sm text-gray-600"><strong>Activos:</strong> Generan señal propia (termopar, piezoeléctrico)<br><strong>Pasivos:</strong> Requieren alimentación (termistor, strain gauge)</p>
+                                </div>
+                            </div>
+                            <div class="space-y-4">
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-red-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-heartbeat mr-2 text-red-500"></i>Transductores Biomédicos</h5>
+                                    <p class="text-sm text-gray-600">Presión (strain gauge), temperatura (termistor), biopotenciales (electrodos), flujo (Doppler)</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-orange-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-dna mr-2 text-orange-500"></i>Biosensores</h5>
+                                    <p class="text-sm text-gray-600">Combinan bioreceptor + transductor<br><strong>Ejemplo:</strong> Glucómetro (glucosa oxidasa + electroquímico)</p>
+                                </div>
+                                <div class="bg-white rounded-lg p-4 shadow-sm border-l-4 border-teal-500">
+                                    <h5 class="font-semibold text-gray-800 mb-2"><i class="fas fa-check-double mr-2 text-teal-500"></i>Selección de Transductor</h5>
+                                    <p class="text-sm text-gray-600">Depende de: rango requerido, sensibilidad, velocidad de respuesta, ambiente de uso, biocompatibilidad</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                            <h4 class="font-semibold text-yellow-800 mb-3"><i class="fas fa-lightbulb mr-2"></i>Consejos para tu Prueba Corta</h4>
+                            <ul class="space-y-2 text-yellow-800">
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Diferencia entre sensor y transductor</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Conoce las características de los transductores</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Distingue transductores activos de pasivos con ejemplos</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Identifica transductores biomédicos comunes y sus aplicaciones</li>
+                                <li class="flex items-start"><i class="fas fa-check-circle mr-2 mt-1 text-yellow-600"></i>Comprende la estructura y funcionamiento de biosensores</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Step 8: Autoevaluación -->
+                    <div class="step-content" data-step="8">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-6"><i class="fas fa-question-circle mr-3 text-green-600"></i>Autoevaluación</h2>
+                        <p class="text-gray-700 mb-6">Responde las siguientes preguntas para verificar tu comprensión. Esta autoevaluación <strong>no tiene calificación</strong>, es solo para práctica.</p>
+
+                        <div id="quiz-container" class="space-y-6">
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="1">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-green-600">Pregunta 1:</span> ¿Cuál es la función principal de un transductor?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Detectar cambios físicos</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Convertir una forma de energía en otra</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Amplificar señales</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Filtrar el ruido</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="2">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-green-600">Pregunta 2:</span> Un termistor es un ejemplo de transductor:</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Activo, porque genera voltaje</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Pasivo, porque cambia su resistencia</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Activo, porque detecta temperatura</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Ninguna de las anteriores</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="3">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-green-600">Pregunta 3:</span> ¿Qué característica describe la diferencia de salida cuando la entrada aumenta vs cuando disminuye?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Linealidad</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Histéresis</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Sensibilidad</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Deriva térmica</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="4">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-green-600">Pregunta 4:</span> ¿Cuál de los siguientes es un transductor activo?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Termistor</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">b) Strain gauge</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">c) Termopar</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Fotorresistor</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="5">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-green-600">Pregunta 5:</span> En un biosensor, ¿cuál es la función del bioreceptor?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Convertir la señal en electricidad</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">b) Reconocer específicamente el analito</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">c) Amplificar la señal</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) Filtrar interferencias</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+
+                            <div class="quiz-question bg-white rounded-xl p-6 shadow-sm border border-gray-200" data-question="6">
+                                <p class="font-semibold text-gray-800 mb-4"><span class="text-green-600">Pregunta 6:</span> ¿Qué tipo de transductor se utiliza comúnmente para medir presión arterial?</p>
+                                <div class="space-y-2">
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">a) Termopar</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">b) Fotodiodo</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200" data-correct="true">c) Strain gauge</button>
+                                    <button class="quiz-option w-full text-left p-3 rounded-lg border border-gray-200">d) LVDT</button>
+                                </div>
+                                <div class="quiz-feedback hidden mt-4 p-4 rounded-lg"></div>
+                            </div>
+                        </div>
+
+                        <div id="quiz-results" class="hidden mt-8 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl p-6">
+                            <h4 class="text-xl font-semibold mb-2"><i class="fas fa-trophy mr-2"></i>Resultados de tu Autoevaluación</h4>
+                            <p id="quiz-score" class="text-lg"></p>
+                            <p class="text-green-100 mt-2 text-sm">Recuerda: Esta autoevaluación es solo práctica. Tu prueba corta será presencial.</p>
+                        </div>
+
+                        <div class="mt-8 bg-green-50 border border-green-200 rounded-xl p-6 text-center">
+                            <div class="text-green-600 text-5xl mb-4"><i class="fas fa-check-circle"></i></div>
+                            <h4 class="text-xl font-semibold text-green-800 mb-2">¡Has completado el Módulo 1B!</h4>
+                            <p class="text-green-700">Estás listo para tu prueba corta de la Unidad I. ¡Mucho éxito!</p>
+                        </div>
+                    </div>
+
+                    <!-- Navigation Buttons -->
+                    <div class="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+                        <button id="prev-btn" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fas fa-arrow-left mr-2"></i>Anterior
+                        </button>
+                        <div class="flex flex-col items-center">
+                            <span id="step-indicator" class="text-gray-500 font-medium">Paso 1 de 8</span>
+                            <div id="timer-display" class="hidden mt-2 px-4 py-2 bg-orange-100 text-orange-700 rounded-full text-sm font-medium timer-badge">
+                                <i class="fas fa-clock mr-2"></i><span id="timer-text">0:00</span>
+                            </div>
+                        </div>
+                        <button id="next-btn" class="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+                            Siguiente<i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-gray-400 text-sm">TEBI 2035 - Biometría Médica y Transducción</p>
+            <p class="text-gray-500 text-xs mt-2">Instituto Tecnológico de Puerto Rico | Prof. Felipe Hernández Gerena</p>
+        </div>
+    </footer>
+
+    <!-- Scripts externos para mejor mantenibilidad -->
+    <script src="js/config-modulo1b.js"></script>
+    <script src="js/google-sheets.js"></script>
+    <script src="js/task-system.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/quiz.js"></script>
+    <script src="js/app.js"></script>
+
+    <!-- Script de inicialización mínimo -->
+    <script>
+        // Este módulo ahora usa archivos JS externos para mejor mantenibilidad
+        // Ver carpeta js/ para el código fuente
+        // Archivos: config-modulo1b.js, google-sheets.js, task-system.js, navigation.js, quiz.js, app.js
+    </script>
+</body>
+</html>

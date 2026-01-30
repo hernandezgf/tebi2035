@@ -54,8 +54,8 @@ const CONFIG = {
             id: 5,
             title: 'Transductores Biomédicos',
             icon: 'fa-heartbeat',
-            hasTimer: false,  // PRUEBA: sin timer
-            taskDuration: 0
+            hasTimer: true,
+            taskDuration: 900  // 15 minutos para el video
         },
         {
             id: 6,

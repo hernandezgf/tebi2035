@@ -20,7 +20,7 @@ const TASK_STATE = {
 /**
  * Inicializa el sistema para un paso específico
  */
-function initStepTimer(stepNum) {
+async function initStepTimer(stepNum) {
     console.log('[TIMER] initStepTimer llamado para step:', stepNum);
     const step = CONFIG.STEPS[stepNum - 1];
     if (!step) {
@@ -33,7 +33,7 @@ function initStepTimer(stepNum) {
     // Determinar el tipo de cronómetro
     if (step.hasTask && step.taskDuration > 0) {
         console.log('[TIMER] Iniciando TaskSystem (hasTask)');
-        initTaskSystem(stepNum);
+        await initTaskSystem(stepNum);
     } else if (step.hasTimer && step.taskDuration > 0) {
         console.log('[TIMER] Iniciando SimpleTimer (hasTimer)');
         initSimpleTimer(stepNum);
@@ -47,7 +47,7 @@ function initStepTimer(stepNum) {
 /**
  * Inicializa el sistema de tareas (con textarea)
  */
-function initTaskSystem(stepNum) {
+async function initTaskSystem(stepNum) {
     const step = CONFIG.STEPS[stepNum - 1];
     const taskId = step.taskId;
 
@@ -58,6 +58,13 @@ function initTaskSystem(stepNum) {
     console.log('[TASK] Tarea guardada:', savedTask);
     if (savedTask && savedTask.completed) {
         console.log('[TASK] Tarea ya completada, mostrando estado completado');
+
+        // Verificar si necesita sincronización con Google Sheets
+        if (!savedTask.syncedToCloud && APP_STATE.isOnlineMode && APP_STATE.currentStudent) {
+            console.log('[TASK] Tarea no sincronizada, reintentando...');
+            await retrySyncTask(taskId);
+        }
+
         showTaskCompleted(taskId, savedTask.response);
         unlockNavigation(stepNum);
         return;
@@ -561,3 +568,54 @@ document.addEventListener('input', function(e) {
         }
     }
 });
+
+// ============================================
+// BLOQUEAR PEGADO DE TEXTO EN TAREAS
+// ============================================
+
+document.addEventListener('paste', function(e) {
+    if (e.target.id && e.target.id.startsWith('task-response-')) {
+        e.preventDefault();
+
+        // Mostrar notificación de que no se puede pegar
+        const taskId = e.target.id.replace('task-response-', '');
+        showPasteBlockedNotification(taskId);
+    }
+});
+
+// También bloquear el menú contextual de pegar y atajos de teclado
+document.addEventListener('keydown', function(e) {
+    if (e.target.id && e.target.id.startsWith('task-response-')) {
+        // Bloquear Ctrl+V, Cmd+V, Ctrl+Shift+V, Cmd+Shift+V
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) {
+            e.preventDefault();
+            const taskId = e.target.id.replace('task-response-', '');
+            showPasteBlockedNotification(taskId);
+        }
+    }
+});
+
+/**
+ * Muestra una notificación cuando se intenta pegar texto
+ */
+function showPasteBlockedNotification(taskId) {
+    // Verificar si ya existe una notificación
+    let notification = document.getElementById('paste-blocked-notification');
+    if (notification) {
+        notification.remove();
+    }
+
+    // Crear nueva notificación
+    notification = document.createElement('div');
+    notification.id = 'paste-blocked-notification';
+    notification.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
+    notification.innerHTML = '<i class="fas fa-ban"></i><span>No se permite pegar texto. Debes escribir tu respuesta.</span>';
+    document.body.appendChild(notification);
+
+    // Remover después de 3 segundos
+    setTimeout(() => {
+        if (notification && notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
